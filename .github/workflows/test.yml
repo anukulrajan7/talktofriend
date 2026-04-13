@@ -34,4 +34,4 @@ jobs:
         run: node --check server/server.js server/signaling.js server/sfu.js server/db.js server/limits.js server/logger.js server/metrics.js server/words.js
 
       - name: Syntax check — client files
-        run: node --check public/js/app-index.js public/js/app-room.js public/js/chat.js public/js/media.js public/js/mesh.js public/js/reactions.js public/js/sfu-client.js public/js/signaling.js
+        run: node --check public/js/app-room.js public/js/chat.js public/js/media.js public/js/mesh.js public/js/reactions.js public/js/sfu-client.js public/js/signaling.js public/js/sounds.js public/js/speaking-detector.js public/sw.js

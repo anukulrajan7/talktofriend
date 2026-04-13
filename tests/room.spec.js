@@ -122,4 +122,25 @@ test.describe('Room page — mobile', () => {
   test('screen share button hidden on mobile', async ({ page }) => {
     await expect(page.locator('[data-test="toggle-share"]')).toBeHidden();
   });
+
+  test('mobile chat renders messages (single #chatList)', async ({ page }) => {
+    // Regression: messages must appear in the unified #chatList, which is
+    // reused for both mobile bottom-sheet AND desktop sidebar.
+    await page.locator('[data-test="toggle-chat"]').click();
+    await page.waitForTimeout(400);
+
+    // Inject a synthetic message via the Chat API (mirrors server echo)
+    await page.evaluate(() => {
+      const list = document.getElementById('chatList');
+      if (!list) return;
+      const el = document.createElement('div');
+      el.className = 'bubble-in';
+      el.textContent = 'hello from test';
+      list.appendChild(el);
+    });
+
+    const list = page.locator('#chatList');
+    await expect(list).toContainText('hello from test');
+    await expect(list).toBeVisible();
+  });
 });

@@ -66,6 +66,41 @@
   video { background: #12121a; }
   .ctrl.on { background: rgba(124,58,237,0.15); border-color: rgba(124,58,237,0.5); color: #a78bfa; }
 
+  /* ─── Unified chat panel — one DOM element, responsive positioning ─── */
+  .chat-panel {
+    /* Mobile: bottom-sheet overlay */
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    max-height: 70vh;
+    transform: translateY(100%);
+    transition: transform 350ms cubic-bezier(0.16, 1, 0.3, 1);
+    border-radius: 20px 20px 0 0;
+    z-index: 45;
+    display: flex;
+    flex-direction: column;
+    background: rgba(18, 18, 26, 0.92);
+    backdrop-filter: blur(28px);
+    -webkit-backdrop-filter: blur(28px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .chat-panel.open { transform: translateY(0); }
+  @media (min-width: 768px) {
+    .chat-panel {
+      position: static;
+      transform: none !important;
+      width: 20rem;
+      max-height: none;
+      border-radius: 0;
+      border: none;
+      border-left: 1px solid rgba(255, 255, 255, 0.06);
+      flex-shrink: 0;
+    }
+    .chat-handle { display: none !important; }
+  }
+  @media (min-width: 1024px) {
+    .chat-panel { width: 24rem; }
+  }
+
   /* Tile hover lift */
   .tile {
     transition: transform 250ms cubic-bezier(0.16, 1, 0.3, 1);
@@ -182,8 +217,9 @@
     <div id="reactions" class="absolute inset-0 pointer-events-none overflow-hidden"></div>
   </main>
 
-  <!-- ─── CHAT — DESKTOP SIDEBAR ─── -->
-  <aside class="hidden md:flex md:w-80 lg:w-96 glass border-l border-white/5 flex-col shrink-0">
+  <!-- ─── CHAT PANEL (unified: sidebar on desktop, bottom-sheet on mobile) ─── -->
+  <aside class="chat-panel" :class="{ open: chatOpen }" data-test="chat-sheet">
+    <div class="chat-handle bottom-sheet-handle shrink-0" @click="chatOpen = false"></div>
     <div class="px-4 py-3 border-b border-white/5 flex items-center justify-between shrink-0">
       <div class="flex items-center gap-2">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-dim">
@@ -191,18 +227,23 @@
         </svg>
         <span class="text-sm font-medium">chat</span>
       </div>
-      <span class="text-[10px] text-mute uppercase tracking-wider">/rain for confetti</span>
+      <div class="flex items-center gap-2">
+        <span class="text-[10px] text-mute uppercase tracking-wider hidden md:inline">/rain for confetti</span>
+        <button @click="chatOpen = false"
+                class="md:hidden text-mute hover:text-ink text-xl leading-none cursor-pointer"
+                data-test="close-chat">&times;</button>
+      </div>
     </div>
-    <div id="chatList" class="flex-1 overflow-y-auto p-3 space-y-2.5 text-sm"></div>
+    <div id="chatList" class="flex-1 overflow-y-auto p-3 space-y-2.5 text-sm min-h-[200px]"></div>
     <form @submit.prevent="sendChat()" class="p-3 border-t border-white/5 flex gap-2 shrink-0">
       <input x-model="chatInput"
-             data-test="chat-input-desktop"
+             data-test="chat-input"
              type="text"
              maxlength="500"
-             placeholder="type a message…"
+             placeholder="/rain for confetti…"
              class="flex-1 px-3 py-2 rounded-xl bg-white/5 border border-white/8 text-sm outline-none focus:border-brand-400 focus:bg-white/8 placeholder:text-mute min-w-0 transition-all">
       <button type="submit"
-              data-test="send-chat-desktop"
+              data-test="send-chat"
               class="px-4 py-2 rounded-xl bg-brand-500 hover:bg-brand-400 text-white text-xs font-medium transition-colors cursor-pointer shrink-0">
         send
       </button>
@@ -210,32 +251,6 @@
   </aside>
 
 </div>
-
-<!-- ─── CHAT — MOBILE BOTTOM SHEET ─── -->
-<aside class="md:hidden bottom-sheet glass-strong flex flex-col"
-       :class="chatOpen ? 'open' : ''"
-       data-test="chat-sheet">
-  <div class="bottom-sheet-handle shrink-0" @click="chatOpen = false"></div>
-  <div class="px-4 py-2 flex items-center justify-between border-b border-white/5 shrink-0">
-    <span class="text-sm font-medium">chat</span>
-    <button @click="chatOpen = false"
-            class="text-mute hover:text-ink text-xl leading-none cursor-pointer"
-            data-test="close-chat">&times;</button>
-  </div>
-  <div id="chatListMobile" class="flex-1 overflow-y-auto p-3 space-y-2.5 text-sm min-h-[240px]"></div>
-  <form @submit.prevent="sendChat()" class="p-3 border-t border-white/5 flex gap-2 shrink-0">
-    <input x-model="chatInput"
-           data-test="chat-input-mobile"
-           type="text"
-           maxlength="500"
-           placeholder="/rain for confetti…"
-           class="flex-1 px-3 py-2 rounded-xl bg-white/5 border border-white/8 text-sm outline-none focus:border-brand-400 placeholder:text-mute min-w-0 transition-all">
-    <button type="submit"
-            class="px-4 py-2 rounded-xl bg-brand-500 hover:bg-brand-400 text-white text-xs font-medium transition-colors cursor-pointer shrink-0">
-      send
-    </button>
-  </form>
-</aside>
 
 <!-- ─── FLOATING PILL CONTROL BAR ─── -->
 <footer class="fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-40" data-test="controls">

@@ -49,7 +49,7 @@ jobs:
         run: node --check server/server.js server/signaling.js server/sfu.js server/db.js server/limits.js server/logger.js server/metrics.js server/words.js
 
       - name: Syntax check — client files
-        run: node --check public/js/app-index.js public/js/app-room.js public/js/chat.js public/js/media.js public/js/mesh.js public/js/reactions.js public/js/sfu-client.js public/js/signaling.js
+        run: node --check public/js/app-room.js public/js/chat.js public/js/media.js public/js/mesh.js public/js/reactions.js public/js/sfu-client.js public/js/signaling.js public/js/sounds.js public/js/speaking-detector.js public/sw.js
 
   # ── Job 2: deploy ──────────────────────────────────────────────────────────
   deploy:
@@ -76,22 +76,22 @@ jobs:
           script: |
             set -e  # Exit immediately if any command fails
 
-            cd /opt/talktofriend
+            cd /root/talktofriend
 
             # Pull latest code
             git pull origin main
 
             # Rebuild and restart containers (compose file lives in deploy/)
             cd deploy
-            docker-compose build --no-cache
-            docker-compose up -d
+            docker compose build
+            docker compose up -d
 
             # Show container status for the deploy log
-            docker-compose ps
+            docker compose ps
 
-            # Health check — the app must respond 200 on /healthz
+            # Health check — the app must respond 200 on /healthz (host port 3100 via Traefik)
             echo "Waiting for app to be healthy..."
-            sleep 5
-            curl -f http://localhost:3000/healthz || exit 1
+            sleep 10
+            curl -f http://127.0.0.1:3100/healthz || exit 1
 
             echo "Deploy complete."

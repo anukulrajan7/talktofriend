@@ -1,0 +1,7 @@
+apiVersion: 1
+providers:
+  - name: TalkToFriend
+    folder: TalkToFriend
+    type: file
+    options:
+      path: /etc/grafana/provisioning

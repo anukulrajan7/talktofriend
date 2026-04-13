@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tailwindcss.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' wss: ws:;">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Just a call. No sign-up, no tracking. Open a link and start talking. Built in a weekend, vibed into existence.">
+<meta property="og:title" content="TalkToFriend — zero-bs video calls">
+<meta property="og:description" content="No accounts. No tracking. Self-hostable. Max vibes.">
+<meta name="theme-color" content="#060608">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" type="image/svg+xml" href="/icon.svg">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png">
+<link rel="shortcut icon" href="/favicon.ico">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TalkToFriend">
+<title>TalkToFriend — zero-bs video calls</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=Geist+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/styles.css">
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Geist','system-ui','sans-serif'],
+          mono: ['Geist Mono','ui-monospace','monospace'],
+          serif: ['"Instrument Serif"','Georgia','serif'],
+        },
+        colors: {
+          bg:'#060608', surf:'#0e0e12', surf2:'#17171d', line:'#232330',
+          ink:'#f5f5f7', dim:'#a0a0b0', mute:'#6b6b80',
+          brand:{400:'#a78bfa',500:'#7c3aed',600:'#6d28d9'},
+          amber:{400:'#fbbf24',500:'#f59e0b'}, ok:'#10b981', danger:'#ef4444',
+        },
+      },
+    },
+  };
+</script>
+
+<style>
+  [x-cloak] { display: none !important; }
+  body { background: #060608; color: #f5f5f7; letter-spacing: -0.011em; }
+
+  .serif-italic {
+    font-family: 'Instrument Serif', Georgia, serif;
+    font-style: italic;
+    font-weight: 400;
+    letter-spacing: -0.02em;
+  }
+
+  .hero-type {
+    font-weight: 700;
+    letter-spacing: -0.035em;
+    line-height: 0.98;
+  }
+
+  .btn-pill {
+    display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+    padding: 14px 26px;
+    border-radius: 9999px;
+    font-weight: 500;
+    font-size: 15px;
+    letter-spacing: -0.005em;
+    transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
+    cursor: pointer;
+    border: 1px solid transparent;
+  }
+  .btn-primary { background: #f5f5f7; color: #060608; }
+  .btn-primary:hover { background: #fff; transform: translateY(-1px); box-shadow: 0 10px 40px rgba(255,255,255,0.12); }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-ghost { background: transparent; color: #f5f5f7; border-color: rgba(255,255,255,0.14); }
+  .btn-ghost:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.22); }
+
+  .inp {
+    width: 100%;
+    padding: 14px 18px;
+    border-radius: 9999px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: #f5f5f7;
+    font-size: 14px;
+    outline: none;
+    transition: all 200ms ease;
+  }
+  .inp:focus { background: rgba(255,255,255,0.06); border-color: rgba(167, 139, 250, 0.4); }
+  .inp::placeholder { color: #6b6b80; }
+
+  .grain {
+    position: fixed; inset: 0; z-index: 1; pointer-events: none;
+    opacity: 0.025;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/></filter><rect width='120' height='120' filter='url(%23n)' opacity='0.8'/></svg>");
+  }
+
+  .spotlight {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background:
+      radial-gradient(1200px 600px at 50% -10%, rgba(124,58,237,0.12) 0%, transparent 60%),
+      radial-gradient(800px 400px at 85% 95%, rgba(245,158,11,0.05) 0%, transparent 60%);
+  }
+
+  .marquee {
+    display: flex; gap: 48px;
+    animation: marquee 40s linear infinite;
+    white-space: nowrap;
+  }
+  @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+  .step-num {
+    font-family: 'Instrument Serif', Georgia, serif;
+    font-style: italic;
+    font-weight: 400;
+    font-size: 64px;
+    color: rgba(167, 139, 250, 0.8);
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+
+  .feat-row {
+    display: flex; align-items: flex-start; gap: 16px;
+    padding: 24px 0;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    transition: background 200ms ease;
+  }
+  .feat-row:hover { background: rgba(255,255,255,0.015); }
+  .feat-icon {
+    flex-shrink: 0;
+    width: 40px; height: 40px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+    color: #a78bfa;
+  }
+
+  .live-dot { position: relative; width: 6px; height: 6px; border-radius: 50%; background: #10b981; }
+  .live-dot::after {
+    content: ''; position: absolute; inset: -3px; border-radius: 50%;
+    background: #10b981; opacity: 0.3; animation: livePulse 1.6s ease-out infinite;
+  }
+  @keyframes livePulse { 0% { transform: scale(0.8); opacity: 0.3; } 100% { transform: scale(2.2); opacity: 0; } }
+
+  .appear { opacity: 0; transform: translateY(14px); animation: up 800ms cubic-bezier(0.16,1,0.3,1) forwards; }
+  .d-1 { animation-delay: 60ms; }
+  .d-2 { animation-delay: 140ms; }
+  .d-3 { animation-delay: 240ms; }
+  .d-4 { animation-delay: 360ms; }
+  .d-5 { animation-delay: 500ms; }
+  .d-6 { animation-delay: 640ms; }
+  @keyframes up { to { opacity: 1; transform: translateY(0); } }
+</style>
+</head>
+<body class="min-h-screen overflow-x-hidden relative" x-data="landing()" x-init="init()">
+
+<div class="spotlight"></div>
+<div class="grain"></div>
+
+<nav class="relative z-20 w-full flex items-center justify-between px-5 sm:px-10 py-5">
+  <a href="/" class="flex items-center gap-2 group">
+    <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-white">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+    </div>
+    <span class="text-sm font-semibold tracking-tight">TalkToFriend</span>
+  </a>
+  <a href="https://github.com/anukulrajan7/talktofriend" target="_blank" rel="noopener"
+     class="text-xs sm:text-sm text-dim hover:text-ink transition-colors inline-flex items-center gap-1.5">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.9 1.3 1.9 1.3 1.1 1.9 2.9 1.3 3.6 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-6 0-1.3.5-2.4 1.3-3.2-.1-.3-.6-1.6.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.7 1.6.2 2.9.1 3.2.8.8 1.3 1.9 1.3 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3"/></svg>
+    <span>source</span>
+  </a>
+</nav>
+
+<main class="relative z-10 px-5 sm:px-8">
+
+  <section class="max-w-5xl mx-auto pt-12 sm:pt-24 pb-20 sm:pb-28 text-center">
+
+    <div class="appear d-1 inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/8 bg-white/[0.02] text-[11px] sm:text-xs text-dim mb-10">
+      <span class="live-dot"></span>
+      <span class="font-medium tracking-wide">open source · self-hostable · no sign-up</span>
+    </div>
+
+    <h1 class="appear d-2 hero-type text-5xl sm:text-7xl md:text-8xl lg:text-[120px] mb-8">
+      talk to your<br>
+      <span class="serif-italic text-brand-400">friends</span><span class="text-ink">, not forms.</span>
+    </h1>
+
+    <p class="appear d-3 text-base sm:text-lg text-dim max-w-xl mx-auto leading-relaxed mb-10">
+      Open a link. Share the code. Start talking.<br class="hidden sm:block">
+      Up to 20 people, P2P <span class="text-ink">+</span> SFU auto-switching. Zero setup.
+    </p>
+
+    <div class="appear d-4 flex flex-col sm:flex-row items-center justify-center gap-3 mb-6">
+      <button @click="createRoom()"
+              data-test="create-room"
+              class="btn-pill btn-primary w-full sm:w-auto">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+        </svg>
+        start a call
+      </button>
+
+      <button @click="showJoin = !showJoin"
+              data-test="show-join"
+              class="btn-pill btn-ghost w-full sm:w-auto">
+        join with a code
+      </button>
+    </div>
+
+    <div x-show="showJoin" x-transition x-cloak class="max-w-md mx-auto mt-4 space-y-3">
+      <form @submit.prevent="joinRoom()" class="flex gap-2">
+        <input x-model="code"
+               data-test="room-code"
+               type="text"
+               placeholder="happy-tiger-42"
+               spellcheck="false"
+               autocomplete="off"
+               class="inp font-mono flex-1">
+        <button type="submit"
+                data-test="join-room"
+                class="btn-pill btn-ghost shrink-0 !px-6">
+          join
+        </button>
+      </form>
+      <input x-model="name"
+             data-test="name-input"
+             type="text"
+             maxlength="24"
+             placeholder="your name (optional)"
+             class="inp">
+      <p x-show="error" x-text="error" x-transition x-cloak
+         data-test="error-message"
+         class="text-xs text-danger bg-danger/10 border border-danger/20 rounded-full px-4 py-2"></p>
+    </div>
+
+    <p class="appear d-5 text-[11px] text-mute mt-8">
+      free forever · no credit card · no downloads
+    </p>
+  </section>
+
+  <section class="appear d-6 relative py-8 border-y border-white/5 overflow-hidden bg-white/[0.01]">
+    <div class="marquee text-sm text-mute font-medium tracking-wide">
+      <span class="flex items-center gap-12 shrink-0">
+        <span>P2P + SFU</span> <span>·</span>
+        <span>mesh for 2–4</span> <span>·</span>
+        <span>SFU for 5–20</span> <span>·</span>
+        <span>auto-switch</span> <span>·</span>
+        <span>self-hostable</span> <span>·</span>
+        <span>no accounts</span> <span>·</span>
+        <span>no tracking</span> <span>·</span>
+        <span>open source</span> <span>·</span>
+      </span>
+      <span class="flex items-center gap-12 shrink-0" aria-hidden="true">
+        <span>P2P + SFU</span> <span>·</span>
+        <span>mesh for 2–4</span> <span>·</span>
+        <span>SFU for 5–20</span> <span>·</span>
+        <span>auto-switch</span> <span>·</span>
+        <span>self-hostable</span> <span>·</span>
+        <span>no accounts</span> <span>·</span>
+        <span>no tracking</span> <span>·</span>
+        <span>open source</span> <span>·</span>
+      </span>
+    </div>
+  </section>
+
+  <section class="max-w-4xl mx-auto py-24 sm:py-32">
+    <div class="mb-16">
+      <span class="text-xs uppercase tracking-[0.2em] text-mute">/ features</span>
+      <h2 class="hero-type text-4xl sm:text-5xl md:text-6xl mt-4">
+        no sign-ups.<br>
+        <span class="serif-italic text-brand-400">just calls.</span>
+      </h2>
+    </div>
+
+    <div class="border-b border-white/6">
+      <div class="feat-row">
+        <div class="feat-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M2 12h20"/>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+          </svg>
+        </div>
+        <div class="flex-1">
+          <h3 class="text-lg sm:text-xl font-semibold text-ink mb-1.5">P2P <span class="text-dim">+</span> SFU</h3>
+          <p class="text-sm text-dim leading-relaxed">Mesh for small groups (2–4), SFU for larger rooms (5–20). Auto-switches at the boundary. Zero config, zero lag.</p>
+        </div>
+        <span class="serif-italic text-brand-400 text-2xl hidden sm:block">01</span>
+      </div>
+
+      <div class="feat-row">
+        <div class="feat-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        </div>
+        <div class="flex-1">
+          <h3 class="text-lg sm:text-xl font-semibold text-ink mb-1.5">Up to 20 people</h3>
+          <p class="text-sm text-dim leading-relaxed">Big enough for your team, small enough for your friends. Scales from 1:1 to 20 without changing tools.</p>
+        </div>
+        <span class="serif-italic text-brand-400 text-2xl hidden sm:block">02</span>
+      </div>
+
+      <div class="feat-row">
+        <div class="feat-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="2" width="20" height="8" rx="2"/>
+            <rect x="2" y="14" width="20" height="8" rx="2"/>
+            <line x1="6" y1="6" x2="6.01" y2="6"/>
+            <line x1="6" y1="18" x2="6.01" y2="18"/>
+          </svg>
+        </div>
+        <div class="flex-1">
+          <h3 class="text-lg sm:text-xl font-semibold text-ink mb-1.5">Self-host in one command</h3>
+          <p class="text-sm text-dim leading-relaxed">One <code class="font-mono text-xs bg-white/5 px-1.5 py-0.5 rounded">docker compose up</code> and you're live. Your VPS, your data, no vendor lock-in — ever.</p>
+        </div>
+        <span class="serif-italic text-brand-400 text-2xl hidden sm:block">03</span>
+      </div>
+
+      <div class="feat-row">
+        <div class="feat-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2l1.9 4.9 5.1.5-3.8 3.5 1 5.1L12 13.5l-4.2 2.5 1-5.1L5 7.4l5.1-.5L12 2z"/>
+          </svg>
+        </div>
+        <div class="flex-1">
+          <h3 class="text-lg sm:text-xl font-semibold text-ink mb-1.5">Vibes, not meetings</h3>
+          <p class="text-sm text-dim leading-relaxed">Confetti, reactions, dark mode, hidden easter eggs. Try typing <code class="font-mono text-xs bg-white/5 px-1.5 py-0.5 rounded">/rain</code> in chat.</p>
+        </div>
+        <span class="serif-italic text-brand-400 text-2xl hidden sm:block">04</span>
+      </div>
+
+      <div class="feat-row">
+        <div class="feat-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+            <line x1="12" y1="18" x2="12.01" y2="18"/>
+          </svg>
+        </div>
+        <div class="flex-1">
+          <h3 class="text-lg sm:text-xl font-semibold text-ink mb-1.5">Works on mobile</h3>
+          <p class="text-sm text-dim leading-relaxed">No app install. Works in Safari and Chrome. Bottom-sheet chat, swipe controls, self-view that stays out of the way.</p>
+        </div>
+        <span class="serif-italic text-brand-400 text-2xl hidden sm:block">05</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="max-w-4xl mx-auto py-16 sm:py-24">
+    <div class="mb-14">
+      <span class="text-xs uppercase tracking-[0.2em] text-mute">/ how</span>
+      <h2 class="hero-type text-4xl sm:text-5xl md:text-6xl mt-4">
+        it takes<br>
+        <span class="serif-italic text-brand-400">10 seconds.</span>
+      </h2>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-10 sm:gap-6">
+      <div>
+        <div class="step-num mb-4">01</div>
+        <h3 class="text-base font-semibold text-ink mb-2">Open a link</h3>
+        <p class="text-sm text-dim leading-relaxed">No downloads. No accounts. Just a URL.</p>
+      </div>
+      <div>
+        <div class="step-num mb-4">02</div>
+        <h3 class="text-base font-semibold text-ink mb-2">Share the code</h3>
+        <p class="text-sm text-dim leading-relaxed">Three memorable words like <span class="font-mono text-brand-400">happy-tiger-42</span>.</p>
+      </div>
+      <div>
+        <div class="step-num mb-4">03</div>
+        <h3 class="text-base font-semibold text-ink mb-2">Just talk</h3>
+        <p class="text-sm text-dim leading-relaxed">Fast, fun, zero bullshit.<br>That's literally it.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="max-w-3xl mx-auto py-24 sm:py-32 text-center">
+    <h2 class="hero-type text-4xl sm:text-6xl md:text-7xl mb-8">
+      <span class="serif-italic text-brand-400">ready?</span><br>
+      hop on a call.
+    </h2>
+    <button @click="createRoom()" class="btn-pill btn-primary">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+      </svg>
+      start a call
+    </button>
+  </section>
+
+</main>
+
+<footer class="relative z-10 border-t border-white/5 px-5 sm:px-10 py-10 mt-10">
+  <div class="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-5 text-xs">
+    <div class="flex items-center gap-2 text-dim">
+      <div class="w-5 h-5 rounded-md bg-gradient-to-br from-brand-400 to-brand-600"></div>
+      <span>TalkToFriend</span>
+      <span class="text-mute">·</span>
+      <span class="text-mute">a weekend vibe project</span>
+    </div>
+    <div class="flex items-center gap-5 text-mute">
+      <a href="/terms.html" class="hover:text-ink transition-colors">terms</a>
+      <a href="/privacy.html" class="hover:text-ink transition-colors">privacy</a>
+      <a href="https://github.com/anukulrajan7/talktofriend" target="_blank" rel="noopener" class="hover:text-ink transition-colors">github</a>
+    </div>
+  </div>
+</footer>
+
+<script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
+<script>
+function landing() {
+  return {
+    code: '',
+    name: localStorage.getItem('ttf_name') || '',
+    error: '',
+    showJoin: false,
+
+    init() {
+      const p = new URLSearchParams(location.search);
+      if (p.get('room')) {
+        this.code = p.get('room');
+        this.showJoin = true;
+        this.joinRoom();
+      }
+    },
+
+    createRoom() {
+      this.error = '';
+      if (this.name) localStorage.setItem('ttf_name', this.name);
+      const nameParam = this.name ? '&name=' + encodeURIComponent(this.name) : '';
+      location.href = '/room.html?mode=host' + nameParam;
+    },
+
+    joinRoom() {
+      this.error = '';
+      const c = this.code.trim().toLowerCase();
+      if (!c) { this.error = 'enter a room code'; return; }
+      if (!/^[a-z]+-[a-z]+-\d{2}$/.test(c)) {
+        this.error = 'codes look like: happy-tiger-42';
+        return;
+      }
+      if (this.name) localStorage.setItem('ttf_name', this.name);
+      const nameParam = this.name ? '&name=' + encodeURIComponent(this.name) : '';
+      location.href = '/room.html?mode=guest&code=' + encodeURIComponent(c) + nameParam;
+    },
+  };
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>TalkToFriend — Admin</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: { sans: ['Geist','system-ui','sans-serif'], mono: ['Geist Mono','ui-monospace','monospace'] },
+        colors: {
+          bg:'#0a0a0f', surf:'#12121a', surf2:'#1a1a26', surf3:'#222230', line:'#2a2a3a',
+          ink:'#f0f0f3', dim:'#a1a1b5', mute:'#6b6b80',
+          brand:{50:'#f5f3ff',100:'#ede9fe',400:'#a78bfa',500:'#7c3aed',600:'#6d28d9'},
+          amber:{400:'#fbbf24',500:'#f59e0b'}, ok:'#10b981', danger:'#ef4444',
+        },
+      },
+    },
+  };
+</script>
+
+<style>
+  body { background: #0a0a0f; color: #f0f0f3; }
+  .glass {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    backdrop-filter: blur(12px);
+  }
+  .glass-light {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .stat-value { font-variant-numeric: tabular-nums; }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .live-dot { animation: pulse-dot 2s ease-in-out infinite; }
+</style>
+</head>
+<body class="min-h-screen font-sans">
+
+<div class="max-w-5xl mx-auto px-4 py-8">
+
+  <!-- Header -->
+  <header class="mb-8 flex items-center justify-between">
+    <div>
+      <div class="flex items-center gap-2 mb-1">
+        <a href="/" class="text-mute hover:text-dim text-sm transition-colors">TalkToFriend</a>
+        <span class="text-mute text-sm">/</span>
+        <span class="text-ink text-sm font-medium">admin</span>
+      </div>
+      <h1 class="text-2xl font-bold text-ink">Server Dashboard</h1>
+      <p class="text-sm text-mute mt-0.5">No auth — self-host only. Do not expose publicly.</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <span id="status-dot" class="w-2 h-2 rounded-full bg-ok live-dot"></span>
+      <span id="status-text" class="text-xs text-dim font-mono">connecting…</span>
+    </div>
+  </header>
+
+  <!-- Live gauges row -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+    <div class="glass rounded-2xl p-4">
+      <p class="text-xs text-mute mb-1 uppercase tracking-wider">Active Rooms</p>
+      <p id="g-rooms" class="stat-value text-3xl font-bold text-ink">—</p>
+    </div>
+    <div class="glass rounded-2xl p-4">
+      <p class="text-xs text-mute mb-1 uppercase tracking-wider">Peers in Rooms</p>
+      <p id="g-peers" class="stat-value text-3xl font-bold text-ink">—</p>
+    </div>
+    <div class="glass rounded-2xl p-4">
+      <p class="text-xs text-mute mb-1 uppercase tracking-wider">WebSockets</p>
+      <p id="g-sockets" class="stat-value text-3xl font-bold text-ink">—</p>
+    </div>
+    <div class="glass rounded-2xl p-4">
+      <p class="text-xs text-mute mb-1 uppercase tracking-wider">Uptime</p>
+      <p id="g-uptime" class="stat-value text-2xl font-bold text-ink font-mono">—</p>
+    </div>
+  </div>
+
+  <!-- SFU stats row -->
+  <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+    <div class="glass rounded-2xl p-4">
+      <p class="text-xs text-mute mb-1 uppercase tracking-wider">SFU Workers</p>
+      <p id="g-sfu-workers" class="stat-value text-3xl font-bold text-brand-400">—</p>
+      <p id="g-sfu-pids" class="text-[10px] text-mute font-mono mt-1 truncate"></p>
+    </div>
+    <div class="glass rounded-2xl p-4">
+      <p class="text-xs text-mute mb-1 uppercase tracking-wider">SFU Routers (rooms)</p>
+      <p id="g-sfu-routers" class="stat-value text-3xl font-bold text-brand-400">—</p>
+    </div>
+    <div class="glass rounded-2xl p-4">
+      <p class="text-xs text-mute mb-1 uppercase tracking-wider">DB Rooms / Messages</p>
+      <p id="g-db" class="stat-value text-2xl font-bold text-ok">—</p>
+    </div>
+  </div>
+
+  <!-- Totals + Rate limits row -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+
+    <!-- Totals -->
+    <div class="glass rounded-2xl p-5">
+      <h2 class="text-xs text-mute uppercase tracking-wider mb-3 font-medium">All-Time Totals</h2>
+      <div class="grid grid-cols-2 gap-y-2 gap-x-4">
+        <div class="flex justify-between items-center">
+          <span class="text-xs text-dim">Rooms created</span>
+          <span id="t-roomsCreated" class="stat-value text-sm font-mono text-ink">—</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-xs text-dim">Rooms destroyed</span>
+          <span id="t-roomsDestroyed" class="stat-value text-sm font-mono text-ink">—</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-xs text-dim">Peers joined</span>
+          <span id="t-peersJoined" class="stat-value text-sm font-mono text-ink">—</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-xs text-dim">Peers left</span>
+          <span id="t-peersLeft" class="stat-value text-sm font-mono text-ink">—</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-xs text-dim">Offers relayed</span>
+          <span id="t-offersRelayed" class="stat-value text-sm font-mono text-ink">—</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-xs text-dim">Answers relayed</span>
+          <span id="t-answersRelayed" class="stat-value text-sm font-mono text-ink">—</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-xs text-dim">ICE relayed</span>
+          <span id="t-iceRelayed" class="stat-value text-sm font-mono text-ink">—</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-xs text-dim">Chat messages</span>
+          <span id="t-chatPersisted" class="stat-value text-sm font-mono text-ink">—</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-xs text-dim text-amber-400">Rate limit hits</span>
+          <span id="t-rateLimitHits" class="stat-value text-sm font-mono text-amber-400">—</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-xs text-danger">Errors</span>
+          <span id="t-errors" class="stat-value text-sm font-mono text-danger">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limits -->
+    <div class="glass rounded-2xl p-5">
+      <h2 class="text-xs text-mute uppercase tracking-wider mb-3 font-medium">Configured Limits</h2>
+      <div class="space-y-2" id="limits-container">
+        <p class="text-xs text-mute">Loading…</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- External tools -->
+  <div class="glass rounded-2xl p-5 mb-4">
+    <h2 class="text-xs text-mute uppercase tracking-wider mb-3 font-medium">Monitoring Tools</h2>
+    <p class="text-xs text-mute mb-3">Access via SSH tunnel (<code class="font-mono bg-white/5 px-1 py-0.5 rounded">ssh -L PORT:localhost:PORT user@vps</code>) or local network only.</p>
+    <div class="flex flex-wrap gap-3">
+      <a href="http://localhost:9090" target="_blank" rel="noopener"
+         class="inline-flex items-center gap-2 px-4 py-2 rounded-xl glass-light hover:bg-white/6 transition-colors text-sm text-dim hover:text-ink">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Prometheus :9090
+      </a>
+      <a href="http://localhost:3001" target="_blank" rel="noopener"
+         class="inline-flex items-center gap-2 px-4 py-2 rounded-xl glass-light hover:bg-white/6 transition-colors text-sm text-dim hover:text-ink">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+        Grafana :3001
+      </a>
+      <a href="http://localhost:3002" target="_blank" rel="noopener"
+         class="inline-flex items-center gap-2 px-4 py-2 rounded-xl glass-light hover:bg-white/6 transition-colors text-sm text-dim hover:text-ink">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        Uptime-Kuma :3002
+      </a>
+      <a href="/metrics" target="_blank"
+         class="inline-flex items-center gap-2 px-4 py-2 rounded-xl glass-light hover:bg-white/6 transition-colors text-sm text-dim hover:text-ink">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        /metrics (Prometheus)
+      </a>
+      <a href="/api/stats" target="_blank"
+         class="inline-flex items-center gap-2 px-4 py-2 rounded-xl glass-light hover:bg-white/6 transition-colors text-sm text-dim hover:text-ink">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        /api/stats (JSON)
+      </a>
+      <a href="/healthz" target="_blank"
+         class="inline-flex items-center gap-2 px-4 py-2 rounded-xl glass-light hover:bg-white/6 transition-colors text-sm text-dim hover:text-ink">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        /healthz
+      </a>
+    </div>
+  </div>
+
+  <!-- Last updated + refresh note -->
+  <div class="flex items-center justify-between text-xs text-mute">
+    <span>Auto-refreshes every 5s. <span id="last-updated"></span></span>
+    <a href="/" class="hover:text-dim transition-colors">back to app</a>
+  </div>
+
+</div>
+
+<script>
+function fmtUptime(sec) {
+  if (sec < 60) return sec + 's';
+  if (sec < 3600) return Math.floor(sec / 60) + 'm ' + (sec % 60) + 's';
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  return h + 'h ' + m + 'm';
+}
+
+function fmtKey(k) {
+  return k.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
+}
+
+function setText(id, v) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = v;
+}
+
+async function refresh() {
+  try {
+    const res = await fetch('/api/stats');
+    if (!res.ok) throw new Error(res.status);
+    const d = await res.json();
+
+    // Status indicator
+    document.getElementById('status-dot').style.background = '#10b981';
+    setText('status-text', 'live');
+
+    // Gauges
+    setText('g-rooms', d.rooms ?? '—');
+    setText('g-peers', d.peersInRooms ?? '—');
+    setText('g-sockets', d.sockets ?? '—');
+    setText('g-uptime', d.uptimeSec != null ? fmtUptime(d.uptimeSec) : '—');
+
+    // SFU
+    if (d.sfu) {
+      setText('g-sfu-workers', d.sfu.workers ?? '—');
+      setText('g-sfu-routers', d.sfu.routers ?? '—');
+      const pids = document.getElementById('g-sfu-pids');
+      if (pids && d.sfu.workerPids) {
+        pids.textContent = 'pids: ' + (d.sfu.workerPids.join(', ') || 'none');
+      }
+    }
+
+    // DB
+    if (d.db) {
+      setText('g-db', (d.db.rooms ?? '—') + ' / ' + (d.db.messages ?? '—'));
+    }
+
+    // Totals
+    if (d.totals) {
+      for (const [k, v] of Object.entries(d.totals)) {
+        setText('t-' + k, v.toLocaleString());
+      }
+    }
+
+    // Limits
+    if (d.limits) {
+      const container = document.getElementById('limits-container');
+      container.innerHTML = Object.entries(d.limits).map(([k, v]) =>
+        `<div class="flex justify-between items-center">
+          <span class="text-xs text-dim">${fmtKey(k)}</span>
+          <span class="text-sm font-mono text-ink">${v}</span>
+        </div>`
+      ).join('');
+    }
+
+    setText('last-updated', 'Updated ' + new Date().toLocaleTimeString());
+  } catch (err) {
+    document.getElementById('status-dot').style.background = '#ef4444';
+    setText('status-text', 'error — ' + err.message);
+  }
+}
+
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>

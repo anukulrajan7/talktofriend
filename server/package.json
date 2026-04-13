@@ -1,0 +1,34 @@
+{
+  "name": "talktofriend-node",
+  "version": "1.0.0",
+  "description": "Tiny self-hostable multi-person video call app. Pure WebRTC P2P mesh. Node.js reference implementation.",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node --experimental-sqlite --no-warnings server.js",
+    "dev": "node --watch --experimental-sqlite --no-warnings server.js",
+    "load-test": "k6 run ../load-tests/basic.js"
+  },
+  "keywords": [
+    "webrtc",
+    "p2p",
+    "video-call",
+    "self-hosted",
+    "mesh"
+  ],
+  "author": "Anukul Raj",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "express": "^4.21.1",
+    "express-rate-limit": "^7.4.1",
+    "mediasoup": "^3.19.19",
+    "pino": "^9.5.0",
+    "pino-http": "^10.3.0",
+    "pino-pretty": "^11.3.0",
+    "rate-limiter-flexible": "^5.0.4",
+    "socket.io": "^4.8.0"
+  }
+}

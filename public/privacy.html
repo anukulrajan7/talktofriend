@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="TalkToFriend Privacy Policy — brutally honest about what data exists.">
+<title>Privacy Policy — TalkToFriend</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: { sans: ['Geist','system-ui','sans-serif'], mono: ['Geist Mono','ui-monospace','monospace'] },
+        colors: {
+          bg:'#0a0a0f', surf:'#14141c', surf2:'#1f1f2b', line:'#2a2a38',
+          ink:'#f0f0f3', dim:'#9ca3af', mute:'#6b7280',
+          brand:{50:'#eef2ff',400:'#818cf8',500:'#6366f1',600:'#4f46e5'},
+          amber:{400:'#fbbf24',500:'#f59e0b'}, ok:'#10b981', danger:'#ef4444',
+        },
+      },
+    },
+  };
+</script>
+
+<style>
+  body { font-family: 'Geist', system-ui, sans-serif; background: #0a0a0f; color: #f0f0f3; }
+
+  .orb { position:fixed; border-radius:50%; filter:blur(100px); opacity:0.15; pointer-events:none; z-index:0; }
+  .orb-1 { width:400px; height:400px; background:#6366f1; top:-100px; left:-100px; }
+  .orb-2 { width:300px; height:300px; background:#f59e0b; bottom:-60px; right:-60px; }
+
+  .grad { background:linear-gradient(135deg,#818cf8 0%,#fbbf24 100%); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+
+  .prose h2 { font-size:1.1rem; font-weight:600; color:#f0f0f3; margin-top:2rem; margin-bottom:0.5rem; }
+  .prose p { color:#9ca3af; line-height:1.75; margin-bottom:1rem; }
+  .prose ul { color:#9ca3af; line-height:1.75; margin-bottom:1rem; padding-left:1.25rem; list-style:disc; }
+  .prose ul li { margin-bottom:0.25rem; }
+  .prose a { color:#818cf8; text-decoration:underline; }
+  .prose a:hover { color:#f0f0f3; }
+  .prose strong { color:#f0f0f3; font-weight:500; }
+  .prose hr { border-color:#2a2a38; margin:2rem 0; }
+  .prose blockquote { border-left:2px solid #2a2a38; padding-left:1rem; color:#6b7280; font-style:italic; margin:1rem 0; }
+
+  /* Data table */
+  .data-table { width:100%; border-collapse:collapse; margin-bottom:1.5rem; }
+  .data-table th { text-align:left; font-size:0.75rem; font-weight:500; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em; padding:0.5rem 0.75rem; border-bottom:1px solid #2a2a38; }
+  .data-table td { padding:0.625rem 0.75rem; font-size:0.875rem; color:#9ca3af; border-bottom:1px solid #1f1f2b; }
+  .data-table td:first-child { color:#f0f0f3; font-family:'Geist Mono',ui-monospace,monospace; font-size:0.8rem; }
+
+  /* "None" badge */
+  .badge-none { display:inline-flex; align-items:center; gap:0.375rem; padding:0.2rem 0.6rem; border-radius:9999px; background:#0f1f18; border:1px solid #10b981/30; color:#10b981; font-size:0.75rem; font-weight:500; }
+</style>
+</head>
+<body class="min-h-screen overflow-x-hidden">
+
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+
+<main class="relative z-10 max-w-2xl mx-auto px-5 py-16">
+
+  <!-- Back link -->
+  <a href="/" class="inline-flex items-center gap-2 text-sm text-mute hover:text-dim transition-colors mb-10 group">
+    <svg class="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+    </svg>
+    back to the call
+  </a>
+
+  <!-- Header -->
+  <div class="mb-10">
+    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surf2/80 border border-line text-xs text-dim mb-4">
+      <span class="w-1.5 h-1.5 rounded-full bg-ok animate-pulse"></span>
+      no tracking · no accounts · no nonsense
+    </div>
+    <h1 class="text-3xl sm:text-4xl font-bold tracking-tight mb-2">
+      privacy <span class="grad">policy</span>
+    </h1>
+    <p class="text-sm text-mute">Last updated: April 2026 · Brutally honest edition</p>
+  </div>
+
+  <!-- Content -->
+  <div class="prose">
+
+    <p>We don't want your data. Here's exactly what exists anyway.</p>
+
+    <hr>
+
+    <h2>Data that touches the server</h2>
+
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Where stored</th>
+          <th>How long</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Room codes</td>
+          <td>SQLite</td>
+          <td>24 hours, then deleted</td>
+        </tr>
+        <tr>
+          <td>Chat messages</td>
+          <td>SQLite</td>
+          <td>24 hours, then deleted</td>
+        </tr>
+        <tr>
+          <td>Who's in a room</td>
+          <td>Memory only</td>
+          <td>Until the room ends</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>That's the complete list. Nothing else.</p>
+
+    <h2>Data that never touches the server</h2>
+    <ul>
+      <li>Your video and audio (P2P mesh mode — goes directly browser-to-browser)</li>
+      <li>Your real name (optional, unverified — type literally anything)</li>
+      <li>Your IP address (not logged)</li>
+      <li>Any persistent identifier of any kind</li>
+    </ul>
+
+    <h2>SFU mode (server-assisted calls)</h2>
+    <p>For larger groups, media may pass through the server via an SFU (Selective Forwarding Unit) to improve quality. This media is forwarded in real-time to other participants, never recorded, never stored, and gone the moment the call ends.</p>
+    <p>The SFU routes video — it does not watch it.</p>
+
+    <h2>Third-party services</h2>
+
+    <div class="flex items-center gap-3 p-4 rounded-xl bg-surf border border-line mb-4">
+      <span class="badge-none">
+        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+        none
+      </span>
+      <p class="text-sm text-dim m-0">No Google Analytics, Sentry, Mixpanel, Datadog, ad networks, or anything else phoning home.</p>
+    </div>
+
+    <p>The app makes no requests to third-party services during a call. Zero external telemetry.</p>
+
+    <h2>What we do not collect</h2>
+    <ul>
+      <li>Accounts, emails, or passwords</li>
+      <li>Cookies</li>
+      <li>Analytics or usage tracking</li>
+      <li>Error or crash reports</li>
+      <li>Advertising or device IDs</li>
+      <li>Browser fingerprints</li>
+      <li>Cross-session tracking of any kind</li>
+    </ul>
+
+    <h2>Self-hosted instances</h2>
+    <p>If someone else is running TalkToFriend on their own server, that operator controls everything — their infrastructure, their data, their rules. This policy only covers instances operated by the original author.</p>
+    <p>TalkToFriend is open source. If you're using a third-party hosted instance, you can read the code to verify what it does.</p>
+
+    <h2>Your rights</h2>
+    <p>Since we don't know who you are and store nothing about you beyond 24 hours, there's genuinely nothing to delete, export, or correct. Your data is already gone before you think to ask for it.</p>
+
+    <h2>Questions</h2>
+    <p>Open an issue on <a href="https://github.com/anukulrajan7/talktofriend" target="_blank">GitHub</a>. That's the support channel.</p>
+
+    <hr>
+
+    <blockquote>Short policy because there's genuinely not much to say.</blockquote>
+
+  </div>
+
+  <!-- Footer -->
+  <div class="mt-16 pt-6 border-t border-line flex flex-wrap items-center justify-between gap-4">
+    <p class="text-xs text-mute">
+      <a href="/" class="hover:text-dim transition-colors">TalkToFriend</a>
+      · built in a weekend · not a startup, just a call
+    </p>
+    <div class="flex items-center gap-4 text-xs text-mute">
+      <a href="/terms.html" class="hover:text-dim transition-colors">terms</a>
+      <a href="/privacy.html" class="text-dim">privacy</a>
+      <a href="https://github.com/anukulrajan7/talktofriend" target="_blank" class="hover:text-dim transition-colors">source</a>
+    </div>
+  </div>
+
+</main>
+</body>
+</html>

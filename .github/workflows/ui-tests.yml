@@ -1,0 +1,85 @@
+# UI regression tests for TalkToFriend.
+# Runs on every push and PR targeting main.
+# Ensures the frontend doesn't break on design changes.
+name: UI Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'public/**'
+      - 'server/**'
+      - 'tests/**'
+      - 'playwright.config.js'
+      - 'package.json'
+      - '.github/workflows/ui-tests.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'public/**'
+      - 'server/**'
+      - 'tests/**'
+      - 'playwright.config.js'
+      - 'package.json'
+      - '.github/workflows/ui-tests.yml'
+
+jobs:
+  playwright:
+    name: Playwright — ${{ matrix.project }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [chromium-desktop, chromium-mobile]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install root deps (Playwright)
+        run: npm ci || npm install
+
+      - name: Install server deps
+        run: cd server && npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright tests
+        run: npx playwright test --project=${{ matrix.project }}
+        env:
+          CI: '1'
+
+      - name: Upload HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ matrix.project }}
+          path: playwright-report/
+          retention-days: 14
+
+      - name: Upload test artifacts (videos, traces, failed screenshots)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts-${{ matrix.project }}
+          path: test-results/
+          retention-days: 14
+
+  visual-diff:
+    name: Visual regression summary
+    needs: playwright
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Flag visual regressions
+        run: |
+          echo "::warning::Visual regression detected. Download the 'playwright-artifacts-*' artifact to review diffs."
+          echo "If the change is intentional, run locally: npm run test:update-snapshots, then commit the updated snapshots."

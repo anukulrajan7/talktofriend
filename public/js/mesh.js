@@ -148,6 +148,28 @@
         this.cb.onDataChannel?.(peerId, event.channel);
       };
 
+      pc.oniceconnectionstatechange = () => {
+        const state = pc.iceConnectionState;
+        console.log(`[mesh] ICE state ${peerId}: ${state}`);
+        if (state === "failed") {
+          console.log(`[mesh] ICE restart for ${peerId}`);
+          pc.restartIce();
+        }
+        if (state === "disconnected") {
+          // Give it 5s to recover before cleanup
+          entry._disconnectTimer = setTimeout(() => {
+            if (pc.iceConnectionState === "disconnected") {
+              console.log(`[mesh] peer ${peerId} disconnected timeout — cleaning up`);
+              this._tearDown(peerId);
+              this.cb.onPeerGone?.(peerId);
+            }
+          }, 5000);
+        }
+        if (state === "connected" || state === "completed") {
+          clearTimeout(entry._disconnectTimer);
+        }
+      };
+
       pc.onconnectionstatechange = () => {
         this.cb.onStateChange?.(peerId, pc.connectionState);
       };
@@ -164,7 +186,7 @@
               if (!params.encodings || params.encodings.length === 0) {
                 params.encodings = [{}];
               }
-              params.encodings[0].maxBitrate = 1500000;   // 1.5 Mbps max
+              params.encodings[0].maxBitrate = 2500000;   // 2.5 Mbps for 1080p
               params.encodings[0].maxFramerate = 30;
               sender.setParameters(params).catch(() => {});
             } catch (e) { /* older browsers */ }

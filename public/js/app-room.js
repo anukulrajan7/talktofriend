@@ -418,7 +418,20 @@ function room() {
         tile = this._createTile(id, peerName || this.peers[id]?.name || "friend", false);
         document.getElementById("grid").appendChild(tile);
       }
-      tile.querySelector("video").srcObject = stream;
+      const video = tile.querySelector("video");
+      video.srcObject = stream;
+      // Autoplay fix — some browsers block autoplay; retry on user interaction
+      const playPromise = video.play();
+      if (playPromise) {
+        playPromise.catch(() => {
+          // Autoplay blocked — play on next click anywhere
+          const handler = () => {
+            video.play().catch(() => {});
+            document.removeEventListener("click", handler);
+          };
+          document.addEventListener("click", handler, { once: true });
+        });
+      }
       this.speakingDetector?.track(id, stream);
     },
 

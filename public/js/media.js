@@ -32,8 +32,8 @@ class MediaManager {
         autoGainControl: true,
       } : false,
       video: opts.video !== false ? {
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
+        width: { ideal: 1920, min: 640 },
+        height: { ideal: 1080, min: 480 },
         frameRate: { ideal: 30, max: 30 },
         facingMode: 'user',
       } : false,

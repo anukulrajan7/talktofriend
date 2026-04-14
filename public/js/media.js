@@ -22,11 +22,19 @@ class MediaManager {
     this._screenTrack = null;
   }
 
+  // Quality presets — user can switch via settings
+  static QUALITY = {
+    '720p':  { width: { ideal: 1280, min: 640 }, height: { ideal: 720, min: 480 }, frameRate: { ideal: 30, max: 30 } },
+    '1080p': { width: { ideal: 1920, min: 1280 }, height: { ideal: 1080, min: 720 }, frameRate: { ideal: 30, max: 30 } },
+    '480p':  { width: { ideal: 640, min: 320 }, height: { ideal: 480, min: 240 }, frameRate: { ideal: 24, max: 30 } },
+  };
+
   // Get camera + mic. Returns MediaStream.
-  // Tries HD constraints first, falls back to SD on failure.
+  // Tries requested quality first, falls back to lower on failure.
   async getLocalMedia(opts = {}) {
-    // Default 720p like Google Meet — good balance of quality vs CPU/bandwidth.
-    // 1080p causes frame drops on 4+ peer calls and overloads mobile devices.
+    const quality = opts.quality || '720p';
+    const videoPreset = MediaManager.QUALITY[quality] || MediaManager.QUALITY['720p'];
+
     const constraints = {
       audio: opts.audio !== false ? {
         echoCancellation: true,
@@ -34,9 +42,7 @@ class MediaManager {
         autoGainControl: true,
       } : false,
       video: opts.video !== false ? {
-        width: { ideal: 1280, min: 640 },
-        height: { ideal: 720, min: 480 },
-        frameRate: { ideal: 30, max: 30 },
+        ...videoPreset,
         facingMode: 'user',
       } : false,
     };

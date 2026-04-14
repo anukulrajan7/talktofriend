@@ -46,12 +46,12 @@ class BackgroundProcessor {
     // Load MediaPipe SelfieSegmentation from CDN
     try {
       if (!window.SelfieSegmentation) {
-        await this._loadScript("https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation@0.1/selfie_segmentation.js");
+        await this._loadScript("https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js");
       }
 
       this._segmenter = new window.SelfieSegmentation({
         locateFile: (file) =>
-          `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation@0.1/${file}`,
+          `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`,
       });
 
       this._segmenter.setOptions({

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tailwindcss.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://cdn.jsdelivr.net; media-src 'self' blob:; connect-src 'self' wss: ws: https://cdn.jsdelivr.net; worker-src 'self' blob:;">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tailwindcss.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://cdn.jsdelivr.net; media-src 'self' blob:; connect-src 'self' wss: ws: https://cdn.jsdelivr.net; worker-src 'self' blob: https://cdn.jsdelivr.net;">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a0a0f">
 <link rel="manifest" href="/manifest.json">
@@ -356,6 +356,27 @@
             class="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-danger text-[10px] font-bold flex items-center justify-center"
             x-text="unread"></span>
     </button>
+
+    <!-- Settings -->
+    <div class="relative" x-data="{ sOpen: false }" @click.outside="sOpen = false">
+      <button @click="sOpen = !sOpen" class="ctrl" title="Settings">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+        </svg>
+      </button>
+      <div x-show="sOpen" x-transition x-cloak
+           class="absolute bottom-16 right-0 glass-strong rounded-2xl p-3 shadow-2xl z-50 border border-white/10 min-w-[180px] space-y-2">
+        <div class="text-[11px] text-mute uppercase tracking-wider mb-1">quality</div>
+        <template x-for="q in ['480p', '720p', '1080p']" :key="q">
+          <button @click="switchQuality(q); sOpen = false"
+                  class="w-full text-left px-3 py-1.5 rounded-lg text-sm transition-all cursor-pointer"
+                  :class="videoQuality === q ? 'bg-brand-500/20 text-brand-400 font-medium' : 'text-dim hover:bg-white/5 hover:text-ink'"
+                  x-text="q + (q === '720p' ? ' (default)' : q === '1080p' ? ' (HD)' : ' (low)')">
+          </button>
+        </template>
+      </div>
+    </div>
 
     <div class="w-px h-7 bg-white/10 mx-1"></div>
 

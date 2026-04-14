@@ -26,6 +26,7 @@ function room() {
     _bgProcessor: null,
     controlsVisible: true,
     _controlsTimer: null,
+    videoQuality: '720p',
 
     // Instances
     media: null,
@@ -785,6 +786,36 @@ function room() {
       // Smooth camera-off transition via CSS opacity instead of abrupt black frame
       const selfTile = document.querySelector('[data-peer-id="self"]');
       if (selfTile) selfTile.classList.toggle("cam-off", this.camOff);
+    },
+
+    async switchQuality(quality) {
+      if (quality === this.videoQuality) return;
+      this.videoQuality = quality;
+      this._showToast(`switching to ${quality}...`);
+
+      try {
+        // Re-acquire camera with new quality
+        const stream = await this.media.getLocalMedia({ quality });
+        if (this.micMuted) this.media.setMicEnabled(false);
+        if (this.camOff) this.media.setCamEnabled(false);
+
+        // Update self tile
+        this._addLocalTile(stream);
+
+        // Replace video track in all peer connections
+        const newVideoTrack = this.media.videoTrack;
+        if (newVideoTrack && this.mesh) {
+          this.mesh.localStream = stream;
+          this.mesh.peers.forEach((entry) => {
+            if (entry.videoSender) entry.videoSender.replaceTrack(newVideoTrack);
+          });
+        }
+
+        this._showToast(`${quality} active`);
+      } catch (e) {
+        console.error("Quality switch failed:", e);
+        this._showToast(`${quality} not supported by your camera`);
+      }
     },
 
     async toggleBlur() {

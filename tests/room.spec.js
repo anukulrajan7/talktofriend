@@ -15,6 +15,12 @@ test.describe('Room page', () => {
     await page.goto('/room.html?mode=host&name=tester');
     // Wait for Alpine to boot
     await page.waitForFunction(() => window.Alpine !== undefined, { timeout: 10_000 });
+    // Dismiss any error overlay (signaling errors appear in CI/test env)
+    await page.waitForTimeout(500);
+    await page.evaluate(() => {
+      const o = document.querySelector('[data-test="overlay"]');
+      if (o) { o.style.display = 'none'; o.style.pointerEvents = 'none'; }
+    });
   });
 
   test('header shows room code placeholder', async ({ page }) => {
@@ -93,6 +99,12 @@ test.describe('Room page — mobile', () => {
     await context.grantPermissions(['microphone', 'camera']);
     await page.goto('/room.html?mode=host&name=tester');
     await page.waitForFunction(() => window.Alpine !== undefined, { timeout: 10_000 });
+    // Dismiss any error overlay (signaling errors appear in CI/test env)
+    await page.waitForTimeout(500);
+    await page.evaluate(() => {
+      const o = document.querySelector('[data-test="overlay"]');
+      if (o) { o.style.display = 'none'; o.style.pointerEvents = 'none'; }
+    });
   });
 
   test('chat toggle button exists on mobile', async ({ page }) => {

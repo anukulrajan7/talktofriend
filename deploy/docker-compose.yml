@@ -1,9 +1,10 @@
 # ── Core application stack ────────────────────────────────────
-# App + Caddy only. Monitoring is in docker-compose.monitoring.yml
+# App only. Monitoring at /docker/ttf-monitoring/ on VPS.
+# Traefik handles HTTPS (configured in /docker/traefik-pt36/).
 #
 # WHY network_mode: host?
-#   mediasoup needs UDP ports 40000-49999. Docker port mapping creates
-#   an iptables rule per port (20,000 rules) which OOMs the daemon.
+#   mediasoup needs UDP ports 40000-40200. Docker port mapping creates
+#   an iptables rule per port which OOMs the daemon.
 #   Host networking = zero overhead, direct port access.
 
 services:
@@ -19,20 +20,5 @@ services:
     volumes:
       - app_data:/app/data
 
-  caddy:
-    image: caddy:2-alpine
-    container_name: ttf-caddy
-    restart: always
-    network_mode: host
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-    environment:
-      - DOMAIN=${DOMAIN:-localhost}
-    depends_on:
-      app:
-        condition: service_healthy
-
 volumes:
-  caddy_data:
   app_data:

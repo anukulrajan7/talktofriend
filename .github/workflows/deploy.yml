@@ -72,21 +72,16 @@ jobs:
             # Pull latest code
             git pull origin main
 
-            # ── 1. Rebuild and restart the app (core stack) ──
+            # Rebuild and restart app only (monitoring managed separately)
             cd deploy
-            docker compose -f docker-compose.yml build
-            docker compose -f docker-compose.yml up -d
+            docker compose build
+            docker compose up -d
 
-            # ── 2. Restart monitoring stack (independent) ──
-            docker compose -f docker-compose.monitoring.yml up -d
+            docker compose ps
 
-            # Show container status
-            docker compose -f docker-compose.yml ps
-            docker compose -f docker-compose.monitoring.yml ps
-
-            # Health check — app on host port 3000 (network_mode: host)
+            # Health check (app on PORT from .env, default 3100)
             echo "Waiting for app to be healthy..."
             sleep 8
-            curl -f http://127.0.0.1:3000/healthz || exit 1
+            curl -f http://127.0.0.1:3100/healthz || exit 1
 
             echo "Deploy complete."

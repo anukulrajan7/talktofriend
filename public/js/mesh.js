@@ -211,35 +211,48 @@
         this.cb.onStateChange?.(peerId, pc.connectionState);
       };
 
-      // Add local tracks with adaptive quality (like Google Meet)
-      // Bitrate scales DOWN as more peers join — more connections = more CPU/bandwidth
+      // Add local tracks with adaptive quality
+      // KEY ANTI-FLICKER: match camera resolution to available bitrate.
+      // If bitrate is low, ALSO reduce camera resolution so encoder doesn't
+      // have to fight (which causes visible quality oscillation / flickering).
       const peerCount = this.peers.size;
-      const videoBitrate = peerCount <= 1 ? 1500000   // 1.5 Mbps for 2 people (720p crisp)
-                         : peerCount <= 2 ? 1000000   // 1.0 Mbps for 3 people
-                         :                   600000;  // 600 kbps for 4 people
+      const profile = peerCount <= 1
+        ? { bitrate: 1500000, width: 1280, height: 720, fps: 30 }   // 2 people
+        : peerCount <= 2
+        ? { bitrate: 1200000, width: 960,  height: 540, fps: 30 }   // 3 people
+        : { bitrate: 800000,  width: 640,  height: 480, fps: 24 };  // 4 people
+
       console.log(`[mesh] localStream for ${peerId}:`, this.localStream ? `${this.localStream.getTracks().length} tracks` : 'NULL',
-                   `| bitrate=${(videoBitrate/1000000).toFixed(1)}Mbps (${peerCount+1} peers)`);
+                   `| ${profile.width}x${profile.height}@${profile.fps} ${(profile.bitrate/1000000).toFixed(1)}Mbps (${peerCount+1} peers)`);
 
       if (this.localStream) {
         this.localStream.getTracks().forEach((track) => {
           const sender = pc.addTrack(track, this.localStream);
           if (track.kind === "video") {
             entry.videoSender = sender;
+
+            // Downscale camera to match bitrate — prevents encoder fighting
+            try {
+              track.applyConstraints({
+                width: { ideal: profile.width },
+                height: { ideal: profile.height },
+                frameRate: { ideal: profile.fps },
+              }).catch(() => {});
+            } catch (e) {}
+
             try {
               const params = sender.getParameters();
               if (!params.encodings || params.encodings.length === 0) {
                 params.encodings = [{}];
               }
-              params.encodings[0].maxBitrate = videoBitrate;
-              params.encodings[0].maxFramerate = 30;
-              // "balanced" = encoder adapts BOTH resolution and framerate on congestion
-              // "maintain-resolution" forces frame drops instead — causes flickering
-              params.degradationPreference = "balanced";
+              params.encodings[0].maxBitrate = profile.bitrate;
+              params.encodings[0].maxFramerate = profile.fps;
+              // maintain-framerate: never drops frames (no flicker), may reduce resolution
+              params.degradationPreference = "maintain-framerate";
               sender.setParameters(params).catch(() => {});
-            } catch (e) { /* older browsers */ }
+            } catch (e) {}
 
-            // Set content hint so encoder optimizes for face video
-            try { track.contentHint = "motion"; } catch (e) {}
+            try { track.contentHint = "detail"; } catch (e) {}
           }
           if (track.kind === "audio") {
             try {
@@ -247,9 +260,9 @@
               if (!params.encodings || params.encodings.length === 0) {
                 params.encodings = [{}];
               }
-              params.encodings[0].maxBitrate = 64000;    // 64 kbps Opus
+              params.encodings[0].maxBitrate = 64000;
               sender.setParameters(params).catch(() => {});
-            } catch (e) { /* older browsers */ }
+            } catch (e) {}
           }
         });
       }

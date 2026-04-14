@@ -75,11 +75,22 @@ function room() {
       this.chat = new Chat({
         signaling: this.signaling,
         listEl: document.getElementById("chatList"),
-        onNew: () => {
+        onNew: (msg) => {
           this.sounds?.chat();
           if (!this.chatOpen && window.innerWidth < 768) {
             this.unread++;
             this._showToast("new message");
+          }
+          // Detect effect triggers in received messages — all peers see effects
+          if (msg?.body) {
+            const b = msg.body;
+            if (b.includes("☔")) this._triggerEffect("rain");
+            else if (b.includes("❄️")) this._triggerEffect("snow");
+            else if (b.includes("🎊") || b.includes("🎉")) this._triggerEffect("confetti");
+            else if (b.includes("🥳")) this._triggerEffect("celebrate");
+            else if (b.includes("💕")) this._triggerEffect("hearts");
+            else if (b.includes("🐱")) this._triggerEffect("cat");
+            else if (b.includes("🐶")) this._triggerEffect("dog");
           }
         },
       });
@@ -474,6 +485,52 @@ function room() {
       }
     },
 
+    // Trigger visual/audio effects — used by chat commands, visible to all peers
+    _triggerEffect(effect) {
+      try {
+        if (!window.confetti) return;
+        switch (effect) {
+          case "rain":
+            this.reactions?.confettiRain(4000);
+            break;
+          case "snow": {
+            const end = Date.now() + 4000;
+            (function snowFrame() {
+              window.confetti({ particleCount: 3, startVelocity: 0, ticks: 300,
+                origin: { x: Math.random(), y: 0 }, colors: ["#ffffff", "#e0e7ff", "#c7d2fe"],
+                shapes: ["circle"], gravity: 0.3, scalar: 0.7 });
+              if (Date.now() < end) requestAnimationFrame(snowFrame);
+            })();
+            break;
+          }
+          case "confetti":
+            this.reactions?._confettiBurst();
+            break;
+          case "celebrate":
+            window.confetti({ particleCount: 150, spread: 120, origin: { y: 0.6 },
+              colors: ["#6366f1", "#f59e0b", "#10b981", "#ef4444", "#ec4899"] });
+            this.sounds?.reaction();
+            break;
+          case "hearts": {
+            const end = Date.now() + 3000;
+            (function heartFrame() {
+              window.confetti({ particleCount: 2, startVelocity: 15, ticks: 200,
+                origin: { x: Math.random(), y: 1 }, colors: ["#ef4444", "#ec4899", "#f472b6"],
+                shapes: ["circle"], gravity: -0.2, scalar: 1.2 });
+              if (Date.now() < end) requestAnimationFrame(heartFrame);
+            })();
+            break;
+          }
+          case "cat":
+            this.sounds?._playChord([523, 660, 880], 0.2, 0.06, "sawtooth"); // meow-ish
+            break;
+          case "dog":
+            this.sounds?._playChord([220, 330], 0.15, 0.07, "square"); // woof-ish
+            break;
+        }
+      } catch (e) { console.warn("[effect]", e); }
+    },
+
     _wireReactionEvents() {
       document.addEventListener("react", (e) => {
         this.sounds?.reaction();
@@ -483,22 +540,23 @@ function room() {
 
     _wireKeyboard() {
       document.addEventListener("keydown", (e) => {
-        // Escape always blurs chat input — lets keyboard shortcuts work again
-        if (e.key === "Escape") {
-          document.activeElement?.blur();
-          return;
+        try {
+          if (e.key === "Escape") {
+            document.activeElement?.blur();
+            return;
+          }
+
+          const inInput = ["INPUT", "TEXTAREA"].includes(e.target?.tagName);
+          if (inInput) return; // don't steal keys from chat input
+
+          const key = e.key?.toLowerCase();
+          if (key === "m") { this.toggleMute(); }
+          else if (key === "v") { this.toggleCam(); }
+          else if (key === "s") { this.toggleShare(); }
+          else if (key === "b") { this.toggleBlur(); }
+        } catch (err) {
+          console.error("[keyboard] shortcut error:", err);
         }
-
-        const inInput = ["INPUT", "TEXTAREA"].includes(e.target.tagName);
-
-        // When typing in chat, only handle shortcuts with modifier keys
-        if (inInput && !e.ctrlKey && !e.metaKey) return;
-
-        const key = e.key.toLowerCase();
-        if (key === "m") { e.preventDefault(); this.toggleMute(); }
-        else if (key === "v") { e.preventDefault(); this.toggleCam(); }
-        else if (key === "s" && !inInput) { e.preventDefault(); this.toggleShare(); }
-        else if (key === "b" && !inInput) { e.preventDefault(); this.toggleBlur(); }
       });
 
       // Auto-hide controls after 4s of inactivity (reappear on mouse/touch/key)
@@ -981,19 +1039,25 @@ function room() {
       const text = this.chatInput.trim();
       if (!text) return;
 
-      // Chat commands — intercepted before sending to server
+      // Chat commands — sent as special messages, all peers trigger effects
       if (text.startsWith("/")) {
         const cmd = text.toLowerCase();
-        if (cmd === "/rain") {
-          this.reactions?.confettiRain(4000);
-          this.chat.send("made it rain");
-        } else if (cmd === "/confetti" || cmd === "/party") {
-          this.reactions?._confettiBurst();
-          this.chat.send("party time");
-        } else if (cmd === "/wave") {
-          this.chat.send("👋");
+        const commands = {
+          "/rain":       { msg: "☔ made it rain", effect: "rain" },
+          "/snow":       { msg: "❄️ let it snow",  effect: "snow" },
+          "/confetti":   { msg: "🎊 confetti!",    effect: "confetti" },
+          "/party":      { msg: "🎉 party time!",  effect: "confetti" },
+          "/celebrate":  { msg: "🥳 celebration!",  effect: "celebrate" },
+          "/hearts":     { msg: "💕 sending love",  effect: "hearts" },
+          "/wave":       { msg: "👋", effect: null },
+          "/cat":        { msg: "🐱 meow!", effect: "cat" },
+          "/dog":        { msg: "🐶 woof!", effect: "dog" },
+        };
+        const entry = commands[cmd];
+        if (entry) {
+          if (entry.effect) this._triggerEffect(entry.effect);
+          this.chat.send(entry.msg);
         } else {
-          // Unknown command — send as regular message
           this.chat.send(text);
         }
       } else {

@@ -22,6 +22,8 @@ function room() {
     unread: 0,
     overlay: { show: false, title: "", body: "", emoji: "", dismissable: true },
     showDebug: new URLSearchParams(location.search).has("debug") || location.hostname === "localhost",
+    blurEnabled: false,
+    _bgProcessor: null,
 
     // Instances
     media: null,
@@ -458,6 +460,7 @@ function room() {
         if (e.key === "m" || e.key === "M") this.toggleMute();
         else if (e.key === "v" || e.key === "V") this.toggleCam();
         else if (e.key === "s" || e.key === "S") this.toggleShare();
+        else if (e.key === "b" || e.key === "B") this.toggleBlur();
       });
 
       window.addEventListener("beforeunload", () => {
@@ -535,7 +538,11 @@ function room() {
       video.autoplay = true;
       video.playsInline = true;
       if (isSelf) video.muted = true;
+      // Anti-flicker: GPU compositing + dark bg prevents white/transparent flash
+      // Mirror self-video like every video call app (prevents disorientation)
       video.className = "w-full h-full object-cover";
+      video.style.cssText = "background:#12121a; will-change:transform;" +
+        (isSelf ? "transform:scaleX(-1);" : "");
       tile.appendChild(video);
 
       // Top-right badges container (quality + connection)
@@ -753,6 +760,63 @@ function room() {
     toggleCam() {
       this.camOff = !this.camOff;
       this.media.setCamEnabled(!this.camOff);
+      // Smooth camera-off transition via CSS opacity instead of abrupt black frame
+      const selfTile = document.querySelector('[data-peer-id="self"]');
+      if (selfTile) selfTile.classList.toggle("cam-off", this.camOff);
+    },
+
+    async toggleBlur() {
+      try {
+        if (!this._bgProcessor) {
+          this._bgProcessor = new BackgroundProcessor();
+        }
+
+        if (this.blurEnabled) {
+          // Disable blur — restore original track
+          const origTrack = this._bgProcessor.disable();
+          this.blurEnabled = false;
+          this._showToast("blur off");
+
+          // Replace track in all peer connections
+          if (origTrack && this.mesh) {
+            this.mesh.peers.forEach((entry) => {
+              if (entry.videoSender) entry.videoSender.replaceTrack(origTrack);
+            });
+          }
+          // Update self-tile to show original
+          const selfVideo = document.querySelector('[data-peer-id="self"] video');
+          if (selfVideo && this.media.localStream) {
+            selfVideo.srcObject = this.media.localStream;
+          }
+        } else {
+          // Enable blur
+          this._showToast("loading blur...");
+          await this._bgProcessor.init();
+          const processedTrack = await this._bgProcessor.enable(this.media.videoTrack);
+          this.blurEnabled = true;
+          this._showToast("blur on");
+
+          // Replace video track in all peer connections
+          if (this.mesh) {
+            this.mesh.peers.forEach((entry) => {
+              if (entry.videoSender) entry.videoSender.replaceTrack(processedTrack);
+            });
+          }
+          // Update self-tile to show blurred output
+          const selfVideo = document.querySelector('[data-peer-id="self"] video');
+          if (selfVideo) {
+            const blurStream = new MediaStream([processedTrack]);
+            // Keep audio from original stream
+            const audioTrack = this.media.localStream?.getAudioTracks()[0];
+            if (audioTrack) blurStream.addTrack(audioTrack);
+            selfVideo.srcObject = blurStream;
+          }
+        }
+      } catch (e) {
+        console.error("Background blur failed:", e);
+        this._showToast("blur not available on this device");
+        this.blurEnabled = false;
+      }
     },
 
     async toggleShare() {

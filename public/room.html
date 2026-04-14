@@ -289,6 +289,18 @@
       </svg>
     </button>
 
+    <button @click="toggleBlur()"
+            data-test="toggle-blur"
+            class="ctrl hidden sm:inline-flex"
+            :class="{ on: blurEnabled }"
+            :title="blurEnabled ? 'Blur off (B)' : 'Blur on (B)'">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10" opacity="0.3"/>
+        <circle cx="12" cy="8" r="3"/>
+        <path d="M6.5 18C6.5 14.5 8.5 12 12 12s5.5 2.5 5.5 6"/>
+      </svg>
+    </button>
+
     <button @click="toggleShare()"
             data-test="toggle-share"
             class="ctrl hidden sm:inline-flex"
@@ -422,6 +434,7 @@
 <script src="/js/reactions.js"></script>
 <script src="/js/sounds.js"></script>
 <script src="/js/speaking-detector.js"></script>
+<script src="/js/background-effects.js"></script>
 <script src="/js/app-room.js"></script>
 </body>
 </html>

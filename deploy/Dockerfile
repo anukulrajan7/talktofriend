@@ -25,6 +25,6 @@ ENV NODE_ENV=production
 ENV PORT=3000
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/healthz', r => process.exit(r.statusCode === 200 ? 0 : 1))"
+  CMD node -e "const p=process.env.PORT||3000;require('http').get('http://localhost:'+p+'/healthz',r=>process.exit(r.statusCode===200?0:1))"
 
 CMD ["node", "--experimental-sqlite", "--no-warnings", "server/server.js"]

@@ -1,16 +1,16 @@
-// MeshManager: multi-peer WebRTC (3-4 person mesh).
+// MeshManager: multi-peer WebRTC (2-4 person mesh).
 //
 // Rules:
 // - When someone joins a room, the ALREADY-PRESENT peers initiate
 //   (they receive "peer-joined" and call createOffer).
 // - The new joiner waits for offers from existing peers.
-// - DataChannel for chat is created by the offerer; answerer gets it via
+// - DataChannel for reactions is created by the offerer; answerer gets it via
 //   ondatachannel.
 //
 // Emits callbacks:
 //   onRemoteStream(peerId, stream, name)
 //   onPeerGone(peerId)
-//   onDataChannel(peerId, channel)   — so chat.js can wire up
+//   onDataChannel(peerId, channel)
 //   onStateChange(peerId, state)
 
 (function () {
@@ -23,28 +23,25 @@
     constructor({ signaling, callbacks = {} }) {
       this.signaling = signaling;
       this.cb = callbacks;
-      this.peers = new Map(); // peerId -> { pc, name, dc, videoSender, remoteStream }
+      this.peers = new Map(); // peerId -> { pc, name, dc, videoSender, remoteStream, iceBuf }
       this.localStream = null;
       this.screenStream = null;
+      this._closed = false;
+      this._handlers = {};
 
       this._wire();
     }
 
     _wire() {
-      this.signaling.on("room-joined", ({ peers }) => {
-        // Existing peers will initiate offers to us. We just register them.
-        (peers || []).forEach((p) => {
-          if (!this.peers.has(p.id)) this.peers.set(p.id, { pc: null, name: p.name, dc: null });
-        });
-      });
-
-      this.signaling.on("peer-joined", ({ id, name }) => {
-        // A new peer joined AFTER us. We (existing) initiate.
+      // Store handler references so we can remove them on close()
+      this._handlers.peerJoined = ({ id, name }) => {
+        if (this._closed) return;
         this._ensurePeer(id, name);
         this._initiate(id);
-      });
+      };
 
-      this.signaling.on("offer", async ({ from, sdp }) => {
+      this._handlers.offer = async ({ from, sdp }) => {
+        if (this._closed) return;
         try {
           const pc = this._ensurePC(from);
           await pc.setRemoteDescription(new RTCSessionDescription(sdp));
@@ -56,9 +53,10 @@
           this._tearDown(from);
           this.cb?.onPeerGone?.(from);
         }
-      });
+      };
 
-      this.signaling.on("answer", async ({ from, sdp }) => {
+      this._handlers.answer = async ({ from, sdp }) => {
+        if (this._closed) return;
         try {
           const entry = this.peers.get(from);
           if (!entry?.pc) return;
@@ -68,27 +66,43 @@
           this._tearDown(from);
           this.cb?.onPeerGone?.(from);
         }
-      });
+      };
 
-      this.signaling.on("ice-candidate", async ({ from, candidate }) => {
+      this._handlers.iceCandidate = async ({ from, candidate }) => {
+        if (this._closed) return;
         try {
           const entry = this.peers.get(from);
-          if (!entry?.pc) return;
+          if (!entry?.pc) {
+            // Buffer ICE candidate until peer connection is created
+            const peer = this._ensurePeer(from);
+            peer.iceBuf.push(candidate);
+            return;
+          }
           await entry.pc.addIceCandidate(new RTCIceCandidate(candidate));
         } catch (e) {
           console.warn("[mesh] addIceCandidate:", e);
         }
-      });
+      };
 
-      this.signaling.on("peer-left", ({ id }) => {
+      this._handlers.peerLeft = ({ id }) => {
+        if (this._closed) return;
         this._tearDown(id);
         this.cb.onPeerGone?.(id);
-      });
+      };
+
+      this.signaling.on("peer-joined", this._handlers.peerJoined);
+      this.signaling.on("offer", this._handlers.offer);
+      this.signaling.on("answer", this._handlers.answer);
+      this.signaling.on("ice-candidate", this._handlers.iceCandidate);
+      this.signaling.on("peer-left", this._handlers.peerLeft);
     }
 
     _ensurePeer(id, name) {
-      if (!this.peers.has(id)) this.peers.set(id, { pc: null, name: name || "anonymous", dc: null });
-      else if (name) this.peers.get(id).name = name;
+      if (!this.peers.has(id)) {
+        this.peers.set(id, { pc: null, name: name || "anonymous", dc: null, videoSender: null, remoteStream: null, iceBuf: [] });
+      } else if (name) {
+        this.peers.get(id).name = name;
+      }
       return this.peers.get(id);
     }
 
@@ -128,6 +142,14 @@
         });
       }
 
+      // Drain any buffered ICE candidates
+      if (entry.iceBuf && entry.iceBuf.length > 0) {
+        for (const c of entry.iceBuf) {
+          pc.addIceCandidate(new RTCIceCandidate(c)).catch(() => {});
+        }
+        entry.iceBuf = [];
+      }
+
       return pc;
     }
 
@@ -136,7 +158,7 @@
         const entry = this._ensurePeer(peerId);
         const pc = this._ensurePC(peerId);
 
-        // We initiate → we create the DataChannel
+        // We initiate — we create the DataChannel
         const dc = pc.createDataChannel("chat", { ordered: true });
         entry.dc = dc;
         this.cb.onDataChannel?.(peerId, dc);
@@ -196,6 +218,16 @@
     }
 
     close() {
+      this._closed = true;
+
+      // Remove signaling listeners to prevent duplicate handlers on re-init
+      if (this._handlers.peerJoined) this.signaling.off("peer-joined", this._handlers.peerJoined);
+      if (this._handlers.offer) this.signaling.off("offer", this._handlers.offer);
+      if (this._handlers.answer) this.signaling.off("answer", this._handlers.answer);
+      if (this._handlers.iceCandidate) this.signaling.off("ice-candidate", this._handlers.iceCandidate);
+      if (this._handlers.peerLeft) this.signaling.off("peer-left", this._handlers.peerLeft);
+      this._handlers = {};
+
       this.peers.forEach((_, id) => this._tearDown(id));
       this.screenStream?.getTracks().forEach((t) => t.stop());
       this.screenStream = null;

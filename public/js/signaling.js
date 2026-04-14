@@ -31,6 +31,13 @@
       this.listeners.get(event).push(handler);
     }
 
+    off(event, handler) {
+      const handlers = this.listeners.get(event);
+      if (!handlers) return;
+      const idx = handlers.indexOf(handler);
+      if (idx !== -1) handlers.splice(idx, 1);
+    }
+
     _emit(event, ...args) {
       (this.listeners.get(event) || []).forEach((h) => {
         try { h(...args); } catch (e) { console.error(`[signaling] ${event}:`, e); }

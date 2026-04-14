@@ -253,7 +253,10 @@ function attach(io) {
           room.mode = "sfu"; // set AFTER router is ready
 
           logger.info({ code, peers: room.peers.size }, "room upgraded to SFU mode");
-          io.to(code).emit("upgrade-to-sfu", { rtpCapabilities });
+          // FIX: Use socket.to() instead of io.to() — the triggering peer gets
+          // room-joined with mode="sfu" below, so sending upgrade-to-sfu to them
+          // too would cause double SFU initialization.
+          socket.to(code).emit("upgrade-to-sfu", { rtpCapabilities });
 
           socket.emit("room-joined", {
             code,

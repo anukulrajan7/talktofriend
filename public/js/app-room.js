@@ -15,7 +15,7 @@ function room() {
     peers: {},
     peerCount: 1,
     connState: "connecting", // 'connecting' | 'ok' | 'fail'
-    statusText: "connecting…",
+    statusText: "connecting\u2026",
     statusClass: "text-dim",
     statusDot: "bg-amber-500 animate-pulse",
     toast: "",
@@ -32,8 +32,8 @@ function room() {
     sounds: null,
     speakingDetector: null,
 
-    // Guards
-    _hasHandledConnect: false,
+    // Guards — _initialized stays true forever after first connect
+    _initialized: false,
 
     // Connection quality
     connQuality: "waiting",
@@ -95,12 +95,18 @@ function room() {
       this.signaling.socket.on("connect", async () => {
         console.log("SOCKET CONNECTED", this.mode, this.code);
 
-        // Prevent duplicate execution on reconnect
-        if (this._hasHandledConnect) {
-          console.log("connect already handled, skipping");
+        // --- Reconnection path ---
+        if (this._initialized) {
+          console.log("Reconnection detected, cleaning up and re-joining");
+          this._cleanupForRejoin();
+          if (this.code) {
+            this.signaling.joinRoom(this.code, this.name);
+          }
           return;
         }
-        this._hasHandledConnect = true;
+
+        // --- First connection path ---
+        this._initialized = true;
 
         try {
           const stream = await this.media.getLocalMedia();
@@ -108,7 +114,7 @@ function room() {
         } catch (e) {
           this.overlay = {
             show: true,
-            emoji: "🎤",
+            emoji: "\uD83C\uDFA4",
             title: "Need camera & mic",
             body: "Please grant permission in your browser, then reload this page.",
             dismissable: false,
@@ -150,10 +156,19 @@ function room() {
         this.code = code;
         this.myId = myId;
         this.roomMode = mode || "mesh";
-        this.peerCount = 1 + (peers?.length || 0);
+
+        // FIX: Populate this.peers from initial peer list.
+        // Without this, peerCount resets to 1 whenever peer-joined/peer-left fires
+        // because those recalculate from Object.keys(this.peers) which was empty.
+        this.peers = {};
+        (peers || []).forEach(p => {
+          this.peers[p.id] = { name: p.name, state: "connecting" };
+        });
+        this.peerCount = 1 + Object.keys(this.peers).length;
+
         this.chat.loadHistory(code);
 
-        console.log("room-joined: mode =", this.roomMode, "peers =", peers?.length || 0);
+        console.log("room-joined: mode =", this.roomMode, "peers =", Object.keys(this.peers).length);
 
         if (this.roomMode === "sfu") {
           await this._initSFU();
@@ -161,7 +176,7 @@ function room() {
           this._initMesh();
         }
 
-        this._updateStatus("connecting", "negotiating…");
+        this._updateStatus("connecting", "negotiating\u2026");
       });
 
       this.signaling.on("upgrade-to-sfu", async ({ rtpCapabilities }) => {
@@ -198,9 +213,14 @@ function room() {
       });
 
       this.signaling.on("error-msg", ({ message }) => {
+        // Don't show fatal overlay for "already in room" during reconnect race
+        if (message === "You're already in a room.") {
+          console.warn("Already in room (reconnect race), ignoring");
+          return;
+        }
         this.overlay = {
           show: true,
-          emoji: "🙃",
+          emoji: "\uD83D\uDE43",
           title: "Can't join",
           body: message,
           dismissable: false,
@@ -208,27 +228,20 @@ function room() {
       });
 
       this.signaling.on("disconnect", () => {
-        this._updateStatus("fail", "reconnecting…");
-        this._hasHandledConnect = false;
+        this._updateStatus("fail", "reconnecting\u2026");
         // Show reconnecting toast, don't show fatal overlay yet
-        this._showToast("connection lost, reconnecting…");
+        this._showToast("connection lost, reconnecting\u2026");
       });
 
-      this.signaling.socket.on("reconnect", () => {
-        console.log("Reconnected to server");
-        this._updateStatus("ok", "reconnected");
-        this._showToast("reconnected!");
-        // Re-join the room
-        if (this.code) {
-          this.signaling.joinRoom(this.code, this.name);
-        }
-      });
+      // NOTE: Socket.IO fires "connect" on every reconnection too,
+      // so we handle re-join there (guarded by _initialized).
+      // No need for a separate "reconnect" handler that would double-join.
 
       this.signaling.socket.on("reconnect_failed", () => {
         this._updateStatus("fail", "connection lost");
         this.overlay = {
           show: true,
-          emoji: "📡",
+          emoji: "\uD83D\uDCE1",
           title: "Connection lost",
           body: "Couldn't reconnect to the server. Check your internet and reload.",
           dismissable: false,
@@ -236,7 +249,34 @@ function room() {
       });
     },
 
+    // Clean up stale state before re-joining (on reconnect)
+    _cleanupForRejoin() {
+      this._clearRemoteTiles();
+      if (this.mesh) {
+        this.mesh.close();
+        this.mesh = null;
+      }
+      if (this.sfuClient) {
+        this.sfuClient.close();
+        this.sfuClient = null;
+      }
+      this.peers = {};
+      this.peerCount = 1;
+      if (this.reactions) this.reactions.mesh = null;
+      this._updateStatus("connecting", "reconnecting\u2026");
+    },
+
     _initMesh() {
+      // FIX: Close any existing mesh/SFU before creating new — prevents duplicate listeners
+      if (this.mesh) {
+        this.mesh.close();
+        this.mesh = null;
+      }
+      if (this.sfuClient) {
+        this.sfuClient.close();
+        this.sfuClient = null;
+      }
+
       console.log("Initializing mesh mode");
       this.mesh = new MeshManager({
         signaling: this.signaling,
@@ -258,6 +298,16 @@ function room() {
     },
 
     async _initSFU() {
+      // FIX: Close any existing mesh/SFU before creating new
+      if (this.mesh) {
+        this.mesh.close();
+        this.mesh = null;
+      }
+      if (this.sfuClient) {
+        this.sfuClient.close();
+        this.sfuClient = null;
+      }
+
       console.log("Initializing SFU mode");
       this.sfuClient = new SFUClient({
         signaling: this.signaling,
@@ -334,6 +384,12 @@ function room() {
     },
 
     _addLocalTile(stream) {
+      // FIX: Guard against duplicate self tiles (e.g. on reconnect)
+      const existing = document.querySelector('[data-peer-id="self"]');
+      if (existing) {
+        existing.querySelector("video").srcObject = stream;
+        return;
+      }
       const tile = this._createTile("self", this.name, true);
       tile.querySelector("video").srcObject = stream;
       document.getElementById("grid").appendChild(tile);
@@ -343,7 +399,7 @@ function room() {
     _addRemoteTile(id, stream, peerName) {
       let tile = document.querySelector(`[data-peer-id="${id}"]`);
       if (!tile) {
-        tile = this._createTile(id, peerName || "friend", false);
+        tile = this._createTile(id, peerName || this.peers[id]?.name || "friend", false);
         document.getElementById("grid").appendChild(tile);
       }
       tile.querySelector("video").srcObject = stream;
@@ -354,6 +410,17 @@ function room() {
       this.speakingDetector?.untrack(id);
       const tile = document.querySelector(`[data-peer-id="${id}"]`);
       if (tile) tile.remove();
+    },
+
+    // FIX: New helper — clear all remote tiles (used on reconnect)
+    _clearRemoteTiles() {
+      const grid = document.getElementById("grid");
+      if (!grid) return;
+      grid.querySelectorAll('[data-peer-id]:not([data-peer-id="self"])').forEach(tile => {
+        const peerId = tile.dataset.peerId;
+        this.speakingDetector?.untrack(peerId);
+        tile.remove();
+      });
     },
 
     _createTile(peerId, name, isSelf) {
@@ -404,11 +471,11 @@ function room() {
       // Simple heuristic based on connection state
       const states = peerIds.map(id => this.peers[id]?.state);
       if (states.every(s => s === "connected")) {
-        this.connQuality = "vibes ✨";
+        this.connQuality = "vibes \u2728";
       } else if (states.some(s => s === "connected")) {
-        this.connQuality = "mid 🤷";
+        this.connQuality = "mid \uD83E\uDD37";
       } else {
-        this.connQuality = "ouch 💀";
+        this.connQuality = "ouch \uD83D\uDC80";
       }
     },
 
@@ -455,8 +522,7 @@ function room() {
           await this.sfuClient.produce(this.media.videoTrack);
         }
 
-        // In mesh mode, MeshManager.stopScreenShare already handled track replacement internally.
-        // But since we're using MediaManager for screen share now, tell mesh to update senders.
+        // In mesh mode, replace screen track back with camera on all peer connections
         if (this.mesh && this.media.videoTrack) {
           this.mesh.peers.forEach((entry) => {
             if (entry.videoSender) entry.videoSender.replaceTrack(this.media.videoTrack);

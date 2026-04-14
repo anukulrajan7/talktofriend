@@ -261,9 +261,12 @@ function room() {
       });
     },
 
-    // Clean up stale state before re-joining (on reconnect)
+    // Clean up stale state before re-joining (on reconnect or revisit)
     _cleanupForRejoin() {
+      // Don't touch the local (self) tile — prevent flicker
+      // Only clear remote peer tiles
       this._clearRemoteTiles();
+
       if (this.mesh) {
         this.mesh.close();
         this.mesh = null;
@@ -274,6 +277,7 @@ function room() {
       }
       this.peers = {};
       this.peerCount = 1;
+      this.roomMode = "mesh";
       if (this.reactions) this.reactions.mesh = null;
       this._updateStatus("connecting", "reconnecting\u2026");
     },

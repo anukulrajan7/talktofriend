@@ -512,6 +512,51 @@ function attach(io) {
       callback({ ok: true });
     }));
 
+    // ---------------- GO SFU EVENTS ----------------
+    // These only fire when SFU_BACKEND=go. Client sends standard WebRTC
+    // SDP/ICE via Socket.IO, Node.js proxies to Go SFU via HTTP.
+
+    socket.on("sfu-offer", withMsgLimit(async ({ sdp, type }) => {
+      if (!goSfu) return;
+      const code = socket.data.joinedRoom;
+      if (!code) return;
+
+      const room = rooms.get(code);
+      if (!room || room.sfuBackend !== "go") return;
+
+      try {
+        // First join the peer in Go SFU if not already
+        try {
+          await goSfu.joinPeer(code, socket.id);
+        } catch (e) {
+          // Already joined is fine
+          if (!e.message.includes("already exists")) throw e;
+        }
+
+        // Send offer to Go SFU, get answer back
+        const answer = await goSfu.offer(code, socket.id, { sdp, type });
+        socket.emit("sfu-answer", { sdp: answer.sdp, type: answer.type });
+      } catch (e) {
+        logger.error({ err: e, code, peer: socket.id }, "Go SFU offer failed");
+        socket.emit("error-msg", { message: "SFU negotiation failed" });
+      }
+    }));
+
+    socket.on("sfu-ice", withMsgLimit(async ({ candidate, sdpMid, sdpMLineIndex }) => {
+      if (!goSfu) return;
+      const code = socket.data.joinedRoom;
+      if (!code) return;
+
+      const room = rooms.get(code);
+      if (!room || room.sfuBackend !== "go") return;
+
+      try {
+        await goSfu.addICECandidate(code, socket.id, { candidate, sdpMid, sdpMLineIndex });
+      } catch (e) {
+        logger.warn({ err: e.message, peer: socket.id }, "Go SFU ICE candidate failed");
+      }
+    }));
+
     // ---------------- CHAT ----------------
     socket.on("chat", withMsgLimit(async ({ body }) => {
       try {

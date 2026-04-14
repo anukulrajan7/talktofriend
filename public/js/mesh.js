@@ -152,11 +152,33 @@
         this.cb.onStateChange?.(peerId, pc.connectionState);
       };
 
-      // Add local tracks
+      // Add local tracks with quality constraints
       if (this.localStream) {
         this.localStream.getTracks().forEach((track) => {
           const sender = pc.addTrack(track, this.localStream);
-          if (track.kind === "video") entry.videoSender = sender;
+          if (track.kind === "video") {
+            entry.videoSender = sender;
+            // Set video encoding quality
+            try {
+              const params = sender.getParameters();
+              if (!params.encodings || params.encodings.length === 0) {
+                params.encodings = [{}];
+              }
+              params.encodings[0].maxBitrate = 1500000;   // 1.5 Mbps max
+              params.encodings[0].maxFramerate = 30;
+              sender.setParameters(params).catch(() => {});
+            } catch (e) { /* older browsers */ }
+          }
+          if (track.kind === "audio") {
+            try {
+              const params = sender.getParameters();
+              if (!params.encodings || params.encodings.length === 0) {
+                params.encodings = [{}];
+              }
+              params.encodings[0].maxBitrate = 64000;    // 64 kbps Opus
+              sender.setParameters(params).catch(() => {});
+            } catch (e) { /* older browsers */ }
+          }
         });
       }
 

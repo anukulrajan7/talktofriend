@@ -218,12 +218,24 @@ function room() {
           console.warn("Already in room (reconnect race), ignoring");
           return;
         }
+
+        // Room expired — if host, create a new room automatically
+        if (message === "Room does not exist." && this.mode === "host") {
+          console.log("Room expired, creating a new one");
+          this._showToast("Room expired, creating new room...");
+          this.code = "";
+          this.signaling.createRoom();
+          return;
+        }
+
         this.overlay = {
           show: true,
           emoji: "\uD83D\uDE43",
           title: "Can't join",
-          body: message,
-          dismissable: false,
+          body: this.mode === "guest"
+            ? message + " Ask the host for a new link."
+            : message,
+          dismissable: true,
         };
       });
 

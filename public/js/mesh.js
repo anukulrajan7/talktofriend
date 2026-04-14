@@ -54,6 +54,8 @@
         console.log(`[mesh] peer-joined: ${name} (${id}), I will initiate WebRTC`);
         this._ensurePeer(id, name);
         this._initiate(id);
+        // Update ALL existing peer encodings for new peer count
+        setTimeout(() => this._updateAllEncodings(), 500);
       };
 
       this._handlers.offer = async ({ from, sdp }) => {
@@ -113,6 +115,8 @@
         if (this._closed) return;
         this._tearDown(id);
         this.cb.onPeerGone?.(id);
+        // Re-balance encodings for fewer peers
+        this._updateAllEncodings();
       };
 
       this.signaling.on("peer-joined", this._handlers.peerJoined);
@@ -252,7 +256,7 @@
               sender.setParameters(params).catch(() => {});
             } catch (e) {}
 
-            try { track.contentHint = "detail"; } catch (e) {}
+            try { track.contentHint = "motion"; } catch (e) {} // "motion" for face video (smooth), "detail" for screen share (sharp)
           }
           if (track.kind === "audio") {
             try {
@@ -329,6 +333,44 @@
       });
       this.screenStream.getTracks().forEach((t) => t.stop());
       this.screenStream = null;
+    }
+
+    // Rebalance ALL peer encodings when peer count changes.
+    // Without this, peer A→B still uses 2-person bitrate after C joins,
+    // causing bandwidth fighting → encoder oscillation → visible flicker.
+    _updateAllEncodings() {
+      const peerCount = this.peers.size;
+      const profile = peerCount <= 1
+        ? { bitrate: 1500000, width: 1280, height: 720, fps: 30 }
+        : peerCount <= 2
+        ? { bitrate: 1200000, width: 960,  height: 540, fps: 30 }
+        : { bitrate: 800000,  width: 640,  height: 480, fps: 24 };
+
+      console.log(`[mesh] _updateAllEncodings: ${peerCount} peers → ${profile.width}x${profile.height}@${profile.fps} ${(profile.bitrate/1e6).toFixed(1)}Mbps`);
+
+      this.peers.forEach((entry) => {
+        if (!entry.videoSender) return;
+        try {
+          const params = entry.videoSender.getParameters();
+          if (params.encodings && params.encodings.length > 0) {
+            params.encodings[0].maxBitrate = profile.bitrate;
+            params.encodings[0].maxFramerate = profile.fps;
+            entry.videoSender.setParameters(params).catch(() => {});
+          }
+        } catch (e) {}
+      });
+
+      // Also constrain camera to match
+      if (this.localStream) {
+        const vt = this.localStream.getVideoTracks()[0];
+        if (vt) {
+          vt.applyConstraints({
+            width: { ideal: profile.width },
+            height: { ideal: profile.height },
+            frameRate: { ideal: profile.fps },
+          }).catch(() => {});
+        }
+      }
     }
 
     broadcastDataChannel(message) {

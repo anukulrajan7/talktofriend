@@ -27,6 +27,7 @@ function room() {
     controlsVisible: true,
     _controlsTimer: null,
     videoQuality: '720p',
+    pinnedPeerId: null, // null = gallery view, 'self' or peerId = speaker/pin view
 
     // Instances
     media: null,
@@ -65,7 +66,16 @@ function room() {
           const tile = document.querySelector(`[data-peer-id="${peerId}"]`);
           if (tile) tile.classList.toggle('speaking', speaking);
         },
+        onVolumeChange: (peerId, level) => {
+          // Drive audio-reactive speaking ring glow via CSS variable
+          const tile = document.querySelector(`[data-peer-id="${peerId}"]`);
+          if (tile) tile.style.setProperty('--speak-level', level.toFixed(2));
+        },
       });
+
+      // Mood lighting — shift mesh gradient based on time of day
+      const h = new Date().getHours();
+      document.body.dataset.mood = h < 6 ? 'night' : h < 12 ? 'morning' : h < 18 ? 'afternoon' : 'evening';
 
       this.reactions = new Reactions({
         mesh: null, // will be set after _initMesh
@@ -85,12 +95,14 @@ function room() {
           if (msg?.body) {
             const b = msg.body;
             if (b.includes("☔")) this._triggerEffect("rain");
-            else if (b.includes("❄️")) this._triggerEffect("snow");
+            else if (b.includes("❄️") && b.includes("snow")) this._triggerEffect("snow");
             else if (b.includes("🎊") || b.includes("🎉")) this._triggerEffect("confetti");
             else if (b.includes("🥳")) this._triggerEffect("celebrate");
             else if (b.includes("💕")) this._triggerEffect("hearts");
             else if (b.includes("🐱")) this._triggerEffect("cat");
             else if (b.includes("🐶")) this._triggerEffect("dog");
+            else if (b.includes("🪩")) this._triggerEffect("disco");
+            else if (b.includes("👊") && b.includes("nudge")) this._triggerEffect("nudge");
           }
         },
       });
@@ -236,9 +248,11 @@ function room() {
         // because those recalculate from Object.keys(this.peers) which was empty.
         this.peers = {};
         (peers || []).forEach(p => {
-          this.peers[p.id] = { name: p.name, state: "connecting" };
+          this.peers[p.id] = { name: p.name, state: "connecting", camOff: !!p.camOff };
         });
         this.peerCount = 1 + Object.keys(this.peers).length;
+        // Apply cam-off state for existing peers (late joiner support)
+        this._pendingCamOff = (peers || []).filter(p => p.camOff).map(p => p.id);
 
         this.chat.loadHistory(code);
 
@@ -267,9 +281,18 @@ function room() {
       });
 
       this.signaling.on("peer-joined", ({ id, name }) => {
+        const wasAlone = this.peerCount <= 1;
         this.peers[id] = { name, state: "connecting" };
         this.peerCount = 1 + Object.keys(this.peers).length;
-        this._showToast(`${name} joined`);
+
+        // First-connection celebration — the magic moment
+        if (wasAlone && this.peerCount === 2) {
+          this._showToast("vibes connected ✨");
+          this.sounds?.celebrate();
+          setTimeout(() => { if (window.confetti) window.confetti({ particleCount: 80, spread: 70, origin: { y: 0.7 }, colors: ["#7c3aed","#a78bfa","#fbbf24","#10b981"] }); }, 200);
+        } else {
+          this._showToast(`${name} joined`);
+        }
         this.sounds?.join();
         this._updateConnQuality();
         // In mesh mode, MeshManager handles WebRTC negotiation internally via its own peer-joined listener.
@@ -279,11 +302,22 @@ function room() {
       this.signaling.on("peer-left", ({ id }) => {
         const leftName = this.peers[id]?.name || "friend";
         delete this.peers[id];
-        this.peerCount = 1 + Object.keys(this.peers).length;
         this._showToast(`${leftName} left`);
         this.sounds?.leave();
-        this._updateConnQuality();
         this._removeRemoteTile(id);
+        // Defer peerCount update until AFTER tile exit animation completes.
+        // Updating peerCount immediately changes the grid class (grid-3 → grid-2)
+        // simultaneously with tile removal = compound reflow = video flicker.
+        setTimeout(() => {
+          this.peerCount = 1 + Object.keys(this.peers).length;
+          this._updateConnQuality();
+        }, 350);
+      });
+
+      // Remote camera state — toggle cam-off class on remote tiles
+      this.signaling.on("cam-state", ({ id, camOff }) => {
+        const tile = document.querySelector(`[data-peer-id="${id}"]`);
+        if (tile) tile.classList.toggle("cam-off", camOff);
       });
 
       this.signaling.on("error-msg", ({ message }) => {
@@ -373,7 +407,31 @@ function room() {
         callbacks: {
           onRemoteStream: (id, stream, peerName) => this._addRemoteTile(id, stream, peerName),
           onPeerGone: (id) => this._removeRemoteTile(id),
-          onDataChannel: (id, channel) => this.reactions?.handleIncoming(channel),
+          onDataChannel: (id, channel) => {
+            this.reactions?.handleIncoming(channel);
+            // Also handle cam-state messages from DataChannel (instant P2P path)
+            channel.addEventListener("message", (e) => {
+              try {
+                const msg = JSON.parse(e.data);
+                if (msg.type === "cam-state") {
+                  const tile = document.querySelector(`[data-peer-id="${id}"]`);
+                  if (tile) tile.classList.toggle("cam-off", msg.camOff);
+                } else if (msg.type === "filter") {
+                  const tile = document.querySelector(`[data-peer-id="${id}"]`);
+                  if (tile) {
+                    tile.className = tile.className.replace(/\bfilter-\w+/g, "").trim();
+                    if (msg.filter && msg.filter !== "filter-none") tile.classList.add(msg.filter);
+                  }
+                } else if (msg.type === "frame") {
+                  const tile = document.querySelector(`[data-peer-id="${id}"]`);
+                  if (tile) {
+                    tile.className = tile.className.replace(/\bframe-\w+/g, "").trim();
+                    if (msg.frame && msg.frame !== "frame-none") tile.classList.add(msg.frame);
+                  }
+                }
+              } catch {}
+            });
+          },
           onStateChange: (id, state) => this._onPeerState(id, state),
         },
       });
@@ -527,6 +585,47 @@ function room() {
           case "dog":
             this.sounds?._playChord([220, 330], 0.15, 0.07, "square"); // woof-ish
             break;
+          case "disco": {
+            const grid = document.getElementById("grid");
+            grid?.classList.add("disco-mode");
+            this.sounds?.celebrate();
+            setTimeout(() => grid?.classList.remove("disco-mode"), 10000);
+            break;
+          }
+          case "nudge": {
+            document.querySelectorAll("#grid .tile").forEach(t => {
+              t.classList.add("nudged");
+              t.addEventListener("animationend", () => t.classList.remove("nudged"), { once: true });
+            });
+            this.sounds?.nudge();
+            break;
+          }
+          default:
+            // CSS video filters: filter-vintage, filter-noir, etc.
+            if (effect.startsWith("filter-")) {
+              const selfTile = document.querySelector('[data-peer-id="self"]');
+              if (selfTile) {
+                // Remove any existing filter class
+                selfTile.className = selfTile.className.replace(/\bfilter-\w+/g, "").trim();
+                if (effect !== "filter-none") selfTile.classList.add(effect);
+              }
+              // Broadcast filter to peers via DataChannel
+              if (this.mesh) {
+                this.mesh.broadcastDataChannel(JSON.stringify({ type: "filter", filter: effect }));
+              }
+            }
+            // Tile frames: frame-neon, frame-fire, frame-chill
+            if (effect.startsWith("frame-")) {
+              const selfTile = document.querySelector('[data-peer-id="self"]');
+              if (selfTile) {
+                selfTile.className = selfTile.className.replace(/\bframe-\w+/g, "").trim();
+                if (effect !== "frame-none") selfTile.classList.add(effect);
+              }
+              if (this.mesh) {
+                this.mesh.broadcastDataChannel(JSON.stringify({ type: "frame", frame: effect }));
+              }
+            }
+            break;
         }
       } catch (e) { console.warn("[effect]", e); }
     },
@@ -619,12 +718,32 @@ function room() {
         }
       }
       this.speakingDetector?.track(id, stream);
+      // Apply pending cam-off state for late joiners
+      if (this._pendingCamOff?.includes(id) || this.peers[id]?.camOff) {
+        tile.classList.add("cam-off");
+      }
     },
 
     _removeRemoteTile(id) {
       this.speakingDetector?.untrack(id);
       const tile = document.querySelector(`[data-peer-id="${id}"]`);
-      if (tile) tile.remove();
+      if (!tile) return;
+      // Animate exit instead of instant removal — prevents layout snap flicker
+      tile.classList.add("tile-leave");
+      tile.addEventListener("animationend", () => tile.remove(), { once: true });
+      // Safety: remove even if animationend doesn't fire
+      setTimeout(() => { if (tile.parentNode) tile.remove(); }, 400);
+    },
+
+    // Sync .pinned class on tiles to match reactive pinnedPeerId
+    _syncPinnedTiles() {
+      const grid = document.getElementById("grid");
+      if (!grid) return;
+      grid.querySelectorAll(".tile.pinned").forEach(t => t.classList.remove("pinned"));
+      if (this.pinnedPeerId) {
+        const target = grid.querySelector(`[data-peer-id="${this.pinnedPeerId}"]`);
+        if (target) target.classList.add("pinned");
+      }
     },
 
     // FIX: New helper — clear all remote tiles (used on reconnect)
@@ -693,17 +812,10 @@ function room() {
       label.textContent = isSelf ? `${name} (you)` : name;
       tile.appendChild(label);
 
-      // Double-click to pin/unpin tile (speaker view)
+      // Double-click to pin/unpin tile (speaker view) — uses reactive pinnedPeerId
       tile.addEventListener("dblclick", () => {
-        const grid = document.getElementById("grid");
-        if (tile.classList.contains("pinned")) {
-          tile.classList.remove("pinned");
-          grid.classList.remove("has-pinned");
-        } else {
-          grid.querySelectorAll(".tile.pinned").forEach(t => t.classList.remove("pinned"));
-          tile.classList.add("pinned");
-          grid.classList.add("has-pinned");
-        }
+        this.pinnedPeerId = (this.pinnedPeerId === peerId) ? null : peerId;
+        this._syncPinnedTiles();
       });
 
       // Monitor video resolution for quality badge
@@ -899,6 +1011,11 @@ function room() {
       // Smooth camera-off transition via CSS opacity instead of abrupt black frame
       const selfTile = document.querySelector('[data-peer-id="self"]');
       if (selfTile) selfTile.classList.toggle("cam-off", this.camOff);
+      // Broadcast camera state to all peers (dual-channel for reliability + speed)
+      this.signaling.socket.emit("cam-state", { camOff: this.camOff });
+      if (this.mesh) {
+        this.mesh.broadcastDataChannel(JSON.stringify({ type: "cam-state", camOff: this.camOff }));
+      }
     },
 
     async switchQuality(quality) {
@@ -933,6 +1050,12 @@ function room() {
 
     async toggleBlur() {
       try {
+        // Guard: need an active camera track to blur
+        if (!this.media?.videoTrack || this.camOff) {
+          this._showToast("turn camera on first");
+          return;
+        }
+
         if (!this._bgProcessor) {
           this._bgProcessor = new BackgroundProcessor();
         }
@@ -982,11 +1105,9 @@ function room() {
         await this.media.stopScreenShare();
         this.sharing = false;
         // Unpin self tile when screen share stops
-        const grid = document.getElementById("grid");
-        const selfTile = document.querySelector('[data-peer-id="self"]');
-        if (selfTile?.classList.contains("pinned")) {
-          selfTile.classList.remove("pinned");
-          grid?.classList.remove("has-pinned");
+        if (this.pinnedPeerId === "self") {
+          this.pinnedPeerId = null;
+          this._syncPinnedTiles();
         }
 
         // In SFU mode, re-produce camera track after stopping screen share
@@ -1006,13 +1127,8 @@ function room() {
 
         this.sharing = true;
         // Auto-pin self tile when screen sharing (speaker view)
-        const grid = document.getElementById("grid");
-        const selfTile = document.querySelector('[data-peer-id="self"]');
-        if (selfTile && grid) {
-          grid.querySelectorAll(".tile.pinned").forEach(t => t.classList.remove("pinned"));
-          selfTile.classList.add("pinned");
-          grid.classList.add("has-pinned");
-        }
+        this.pinnedPeerId = "self";
+        this._syncPinnedTiles();
 
         if (this.sfuClient) {
           // SFU: produce screen track (replaces video producer)
@@ -1052,6 +1168,17 @@ function room() {
           "/wave":       { msg: "👋", effect: null },
           "/cat":        { msg: "🐱 meow!", effect: "cat" },
           "/dog":        { msg: "🐶 woof!", effect: "dog" },
+          "/disco":      { msg: "🪩 disco time!", effect: "disco" },
+          "/nudge":      { msg: "👊 nudge!", effect: "nudge" },
+          "/vintage":    { msg: "📷 vintage mode", effect: "filter-vintage" },
+          "/noir":       { msg: "🎬 noir mode", effect: "filter-noir" },
+          "/warm":       { msg: "☀️ warm vibes", effect: "filter-warm" },
+          "/cold":       { msg: "❄️ cold mode", effect: "filter-cold" },
+          "/trippy":     { msg: "🌀 trippy!", effect: "filter-trippy" },
+          "/frame neon": { msg: "⚡ neon frame", effect: "frame-neon" },
+          "/frame fire": { msg: "🔥 fire frame", effect: "frame-fire" },
+          "/frame chill":{ msg: "💎 chill frame", effect: "frame-chill" },
+          "/frame off":  { msg: "frame off", effect: "frame-none" },
         };
         const entry = commands[cmd];
         if (entry) {

@@ -87,6 +87,44 @@ class Sounds {
     this._playChord([392, 523], 0.15, 0.06, "triangle"); // G4→C5 up
   }
 
+  // Ultra-quiet hover tick (G6 sine) — subtle haptic feedback
+  hover() {
+    if (!this.enabled) return;
+    this._playChord([1568], 0.04, 0.015, "sine");
+  }
+
+  // Snappy click (C6 + E6 triangle) — button press feedback
+  click() {
+    if (!this.enabled) return;
+    this._playChord([1047, 1319], 0.06, 0.03, "triangle");
+  }
+
+  // Playful nudge boing — descending sine wobble
+  nudge() {
+    if (!this.enabled) return;
+    try {
+      const ctx = this._ensureContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(400, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.15);
+      osc.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.25);
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.3);
+    } catch (e) {}
+  }
+
+  // Richer chord for first-connection celebration (C5 E5 G5 C6)
+  celebrate() {
+    if (!this.enabled) return;
+    this._playChord([523, 659, 784, 1047], 0.5, 0.06, "sine");
+  }
+
   // Soft low tone for errors
   error() {
     if (!this.enabled) return;

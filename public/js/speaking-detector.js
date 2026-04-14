@@ -1,6 +1,7 @@
 class SpeakingDetector {
-  constructor({ onSpeakingChange }) {
+  constructor({ onSpeakingChange, onVolumeChange }) {
     this.onSpeakingChange = onSpeakingChange;
+    this.onVolumeChange = onVolumeChange; // (peerId, normalizedVolume 0-1) — for audio-reactive UI
     this.ctx = null;
     this.analysers = new Map(); // peerId -> { analyser, data, rafId, speaking }
     this.THRESHOLD = 15; // volume threshold (0-128)
@@ -50,6 +51,10 @@ class SpeakingDetector {
           entry.speaking = nowSpeaking;
           this.onSpeakingChange?.(peerId, nowSpeaking);
         }
+
+        // Expose normalized volume (0-1) for audio-reactive UI (speaking ring glow)
+        const normalizedVol = Math.min(1, avg / 60); // 60 = loud speech
+        this.onVolumeChange?.(peerId, normalizedVol);
 
         entry.rafId = requestAnimationFrame(loop);
       };

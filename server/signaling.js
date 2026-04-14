@@ -254,7 +254,8 @@ function attach(io) {
 
       const existing = [...room.peers.entries()].map(([id, info]) => ({
         id,
-        name: info.name
+        name: info.name,
+        camOff: !!info.camOff,
       }));
 
       room.peers.set(socket.id, {
@@ -387,6 +388,19 @@ function attach(io) {
       if (!validRelay(socket, to)) return;
       io.to(to).emit("answer", { from: socket.id, sdp });
       metrics.inc("answersRelayed");
+    }));
+
+    // Camera state broadcast — relay to all peers in room
+    socket.on("cam-state", withMsgLimit(({ camOff }) => {
+      const code = socket.roomCode;
+      if (!code) return;
+      socket.to(code).emit("cam-state", { id: socket.id, camOff: !!camOff });
+      // Store on peer entry so late joiners get the state
+      const room = rooms.get(code);
+      if (room) {
+        const peer = room.peers.get(socket.id);
+        if (peer) peer.camOff = !!camOff;
+      }
     }));
 
     socket.on("ice-candidate", withMsgLimit(({ to, candidate }) => {

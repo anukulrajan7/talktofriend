@@ -48,10 +48,11 @@ class BackgroundProcessor {
     this._maskCanvas.height = h;
     const mctx = this._maskCanvas.getContext("2d");
     // Radial gradient: transparent center (person), black edges (blur zone)
-    const gradient = mctx.createRadialGradient(w/2, h*0.42, Math.min(w, h) * 0.22, w/2, h*0.45, Math.max(w, h) * 0.55);
+    // Wider oval to cover more of the person — prevents blur on shoulders/arms
+    const gradient = mctx.createRadialGradient(w/2, h*0.45, Math.min(w, h) * 0.30, w/2, h*0.48, Math.max(w, h) * 0.62);
     gradient.addColorStop(0, "rgba(0,0,0,0)");     // center: fully transparent (sharp)
-    gradient.addColorStop(0.6, "rgba(0,0,0,0)");   // still sharp
-    gradient.addColorStop(0.85, "rgba(0,0,0,1)");  // transition to blur
+    gradient.addColorStop(0.55, "rgba(0,0,0,0)");  // still sharp (wider clear zone)
+    gradient.addColorStop(0.8, "rgba(0,0,0,1)");   // transition to blur
     gradient.addColorStop(1, "rgba(0,0,0,1)");      // edge: fully opaque (blurred)
     mctx.fillStyle = gradient;
     mctx.fillRect(0, 0, w, h);
@@ -64,7 +65,14 @@ class BackgroundProcessor {
     this._video.style.cssText = "position:fixed;opacity:0;pointer-events:none;width:1px;height:1px;";
     document.body.appendChild(this._video);
     this._video.srcObject = new MediaStream([sourceTrack]);
-    await this._video.play();
+    try {
+      await this._video.play();
+    } catch (e) {
+      console.warn("[bg-blur] video.play() failed (tab may be in background):", e.message);
+      // Retry on user interaction
+      const retryPlay = () => { this._video?.play().catch(() => {}); document.removeEventListener("click", retryPlay); };
+      document.addEventListener("click", retryPlay, { once: true });
+    }
 
     // Start processing
     this._enabled = true;

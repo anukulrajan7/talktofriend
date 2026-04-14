@@ -1150,6 +1150,11 @@ function room() {
           });
         }
       } else {
+        // Check if screen share is supported (not available on iOS Safari)
+        if (!navigator.mediaDevices?.getDisplayMedia) {
+          this._showToast("screen share not supported on this device");
+          return;
+        }
         const screenTrack = await this.media.startScreenShare();
         if (!screenTrack) return; // cancelled
 

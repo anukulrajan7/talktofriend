@@ -278,7 +278,7 @@
 
     <button @click="toggleBlur()"
             data-test="toggle-blur"
-            class="ctrl hidden sm:inline-flex"
+            class="ctrl"
             :class="{ on: blurEnabled }"
             :title="blurEnabled ? 'Blur off (B)' : 'Blur on (B)'">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -290,7 +290,7 @@
 
     <button @click="toggleShare()"
             data-test="toggle-share"
-            class="ctrl hidden sm:inline-flex"
+            class="ctrl"
             :class="{ off: sharing }"
             title="Screen share (S)">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

@@ -367,6 +367,21 @@ function room() {
           },
           onProducerClosed: (peerId, kind) => {
             console.log(`Producer closed: ${peerId} ${kind}`);
+            // Remove the specific track from the tile's stream
+            const tile = document.querySelector(`[data-peer-id="${peerId}"]`);
+            if (tile) {
+              const video = tile.querySelector("video");
+              const stream = video?.srcObject;
+              if (stream) {
+                const tracks = stream.getTracks().filter(t => t.kind === kind);
+                tracks.forEach(t => { t.stop(); stream.removeTrack(t); });
+              }
+              // If no tracks left, show "cam off" state
+              if (stream && stream.getTracks().length === 0) {
+                video.srcObject = null;
+                tile.style.background = "#12121a";
+              }
+            }
           },
         },
       });
@@ -388,10 +403,15 @@ function room() {
         this._existingProducers = [];
       }
 
-      // FIX: also request existing producers from server as fallback
+      // FIX: request existing producers from server as fallback
       // (handles upgrade-to-sfu race where new-producer events arrive
       // before our listener is registered)
       await this.sfuClient.consumeExisting();
+
+      // Delayed retry: catch producers from peers who finished setup slightly later
+      setTimeout(() => {
+        if (this.sfuClient) this.sfuClient.consumeExisting();
+      }, 3000);
 
       this._updateStatus("ok", "connected (SFU)");
       this._updateConnQuality();

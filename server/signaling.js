@@ -284,13 +284,32 @@ function attach(io) {
           return;
         }
       } else if (room.mode === "upgrading") {
-        // Another peer triggered the upgrade — tell this client to use mesh for now
-        socket.emit("room-joined", {
-          code,
-          myId: socket.id,
-          peers: existing,
-          mode: "mesh",
-        });
+        // Another peer triggered the upgrade — wait for it to complete, then join as SFU
+        const waitStart = Date.now();
+        const waitForSfu = () => {
+          if (room.mode === "sfu") {
+            const router = sfu.getRouter(code);
+            const rtpCapabilities = router ? router.rtpCapabilities : {};
+            const existingProducers = [];
+            for (const [peerId, sfuPeer] of room.sfuPeers.entries()) {
+              for (const [producerId, producer] of sfuPeer.producers.entries()) {
+                existingProducers.push({ producerId, peerId, kind: producer.kind });
+              }
+            }
+            socket.emit("room-joined", {
+              code, myId: socket.id, peers: existing,
+              mode: "sfu", rtpCapabilities, existingProducers,
+            });
+          } else if (room.mode === "mesh" || Date.now() - waitStart > 5000) {
+            // Upgrade failed or timed out — fall back to mesh
+            socket.emit("room-joined", {
+              code, myId: socket.id, peers: existing, mode: "mesh",
+            });
+          } else {
+            setTimeout(waitForSfu, 100);
+          }
+        };
+        setTimeout(waitForSfu, 100);
       } else if (room.mode === "sfu") {
         // Room is already in SFU mode
         const router = sfu.getRouter(code);

@@ -233,6 +233,15 @@
           .catch((e) => errback(e));
       });
 
+      // Monitor transport connection state
+      transport.on("connectionstatechange", (state) => {
+        console.log(`SFU: ${direction} transport state: ${state}`);
+        if (state === "failed") {
+          console.error(`SFU: ${direction} transport failed — closing`);
+          transport.close();
+        }
+      });
+
       if (direction === "send") {
         transport.on("produce", ({ kind, rtpParameters, appData }, callback, errback) => {
           this._request("produce", { kind, rtpParameters, appData })

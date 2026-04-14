@@ -1,29 +1,30 @@
-FROM node:22-bookworm-slim
+# ── Stage 1: Build (compile mediasoup C++ worker) ─────────────
+FROM node:22-bookworm-slim AS builder
 
-# mediasoup native dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 make g++ \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-
-# Copy package files and install
 COPY server/package*.json ./server/
 RUN cd server && npm ci --omit=dev
 
-# Copy app code
+# ── Stage 2: Runtime (no build tools — smaller, faster) ───────
+FROM node:22-bookworm-slim
+
+WORKDIR /app
+
+# Only the compiled node_modules — no python3/make/g++
+COPY --from=builder /app/server/node_modules ./server/node_modules
 COPY server/ ./server/
 COPY public/ ./public/
 
-# Data directory for SQLite
 RUN mkdir -p /app/data
-
-EXPOSE 3000
-# mediasoup RTC ports
-EXPOSE 40000-49999/udp
-EXPOSE 40000-49999/tcp
 
 ENV NODE_ENV=production
 ENV PORT=3000
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/healthz', r => process.exit(r.statusCode === 200 ? 0 : 1))"
 
 CMD ["node", "--experimental-sqlite", "--no-warnings", "server/server.js"]

@@ -10,6 +10,35 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "s"
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "title": "Uptime",
+      "type": "stat",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "ttf_uptime_seconds",
+          "legendFormat": "Uptime",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
           "color": { "mode": "thresholds" },
           "thresholds": {
             "mode": "absolute",
@@ -22,9 +51,14 @@
           "unit": "short"
         }
       },
-      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
-      "id": 1,
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "showThresholdLabels": false, "showThresholdMarkers": true },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "id": 2,
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "auto",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
       "title": "Active Rooms",
       "type": "gauge",
       "targets": [
@@ -45,16 +79,21 @@
             "mode": "absolute",
             "steps": [
               { "color": "green", "value": null },
-              { "color": "yellow", "value": 200 },
-              { "color": "red", "value": 500 }
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 200 }
             ]
           },
           "unit": "short"
         }
       },
-      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
-      "id": 2,
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "showThresholdLabels": false, "showThresholdMarkers": true },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "id": 3,
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "auto",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
       "title": "Connected Peers",
       "type": "gauge",
       "targets": [
@@ -82,9 +121,14 @@
           "unit": "short"
         }
       },
-      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
-      "id": 3,
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "showThresholdLabels": false, "showThresholdMarkers": true },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "id": 4,
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "auto",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
       "title": "WebSocket Connections",
       "type": "gauge",
       "targets": [
@@ -97,33 +141,11 @@
       ]
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
-          "unit": "short"
-        }
-      },
-      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 0 },
-      "id": 4,
-      "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "auto"
-      },
-      "title": "Uptime",
-      "type": "stat",
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "ttf_uptime_seconds",
-          "legendFormat": "Uptime (s)",
-          "refId": "A"
-        }
-      ]
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 4 },
+      "id": 5,
+      "title": "Traffic",
+      "type": "row"
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
@@ -134,10 +156,13 @@
           "unit": "ops"
         }
       },
-      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 4 },
-      "id": 5,
-      "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "list", "placement": "bottom" } },
-      "title": "Rooms Created / Destroyed Rate",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 5 },
+      "id": 6,
+      "options": {
+        "tooltip": { "mode": "multi" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "title": "Room Create / Destroy Rate",
       "type": "timeseries",
       "targets": [
         {
@@ -163,19 +188,35 @@
           "unit": "ops"
         }
       },
-      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 4 },
-      "id": 6,
-      "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "list", "placement": "bottom" } },
-      "title": "Chat Messages Rate",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 5 },
+      "id": 7,
+      "options": {
+        "tooltip": { "mode": "multi" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "title": "Peer Join / Leave Rate",
       "type": "timeseries",
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(ttf_chatPersisted_total[2m])",
-          "legendFormat": "Messages/s",
+          "expr": "rate(ttf_peersJoined_total[2m])",
+          "legendFormat": "Joined/s",
           "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "rate(ttf_peersLeft_total[2m])",
+          "legendFormat": "Left/s",
+          "refId": "B"
         }
       ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 12 },
+      "id": 8,
+      "title": "Signaling & Chat",
+      "type": "row"
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
@@ -186,10 +227,13 @@
           "unit": "ops"
         }
       },
-      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 10 },
-      "id": 7,
-      "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "list", "placement": "bottom" } },
-      "title": "Signaling Traffic (Offers / Answers / ICE)",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 13 },
+      "id": 9,
+      "options": {
+        "tooltip": { "mode": "multi" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "title": "Mesh Signaling Rate",
       "type": "timeseries",
       "targets": [
         {
@@ -217,6 +261,109 @@
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
+          "unit": "ops"
+        }
+      },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 13 },
+      "id": 10,
+      "options": {
+        "tooltip": { "mode": "multi" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "title": "Chat Messages Rate",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "rate(ttf_chatPersisted_total[2m])",
+          "legendFormat": "Messages/s",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 20 },
+      "id": 11,
+      "title": "SFU",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 3 },
+              { "color": "red", "value": 1 }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 5, "w": 8, "x": 0, "y": 21 },
+      "id": 12,
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "auto",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "title": "SFU Workers",
+      "type": "gauge",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "ttf_sfu_workers",
+          "legendFormat": "Workers",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 100 },
+              { "color": "red", "value": 400 }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 5, "w": 8, "x": 8, "y": 21 },
+      "id": 13,
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "auto",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "title": "SFU Routers",
+      "type": "gauge",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "ttf_sfu_routers",
+          "legendFormat": "Routers",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
           "custom": { "lineWidth": 2, "fillOpacity": 15 },
           "unit": "ops"
         },
@@ -231,22 +378,102 @@
           }
         ]
       },
-      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 10 },
-      "id": 8,
-      "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "list", "placement": "bottom" } },
-      "title": "Rate Limit Hits & Errors",
+      "gridPos": { "h": 5, "w": 8, "x": 16, "y": 21 },
+      "id": 14,
+      "options": {
+        "tooltip": { "mode": "multi" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "title": "Errors & Rate Limits",
       "type": "timeseries",
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(ttf_rateLimitHits_total[2m])",
-          "legendFormat": "RateLimit Hits/s",
+          "expr": "rate(ttf_errors_total[2m])",
+          "legendFormat": "Errors/s",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(ttf_errors_total[2m])",
-          "legendFormat": "Errors/s",
+          "expr": "rate(ttf_rateLimitHits_total[2m])",
+          "legendFormat": "RateLimit Hits/s",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 },
+      "id": 15,
+      "title": "Process Health",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
+          "unit": "bytes"
+        }
+      },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 27 },
+      "id": 16,
+      "options": {
+        "tooltip": { "mode": "multi" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "title": "Memory Usage",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "process_resident_memory_bytes",
+          "legendFormat": "Resident",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "process_heap_used_bytes",
+          "legendFormat": "Heap Used",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "process_heap_total_bytes",
+          "legendFormat": "Heap Total",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
+          "unit": "percentunit"
+        }
+      },
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 27 },
+      "id": 17,
+      "options": {
+        "tooltip": { "mode": "multi" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "title": "CPU Usage",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "rate(process_cpu_user_seconds_total[2m])",
+          "legendFormat": "User CPU",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "rate(process_cpu_system_seconds_total[2m])",
+          "legendFormat": "System CPU",
           "refId": "B"
         }
       ]
@@ -256,11 +483,50 @@
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
           "unit": "short"
         }
       },
-      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 16 },
-      "id": 9,
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 27 },
+      "id": 18,
+      "options": {
+        "tooltip": { "mode": "multi" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "title": "Active Handles & Requests",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "nodejs_active_handles_total",
+          "legendFormat": "Active Handles",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "nodejs_active_requests_total",
+          "legendFormat": "Active Requests",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 34 },
+      "id": 19,
+      "title": "All-Time Totals",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 35 },
+      "id": 20,
       "options": {
         "reduceOptions": { "calcs": ["lastNotNull"] },
         "orientation": "horizontal",
@@ -301,153 +567,6 @@
           "expr": "ttf_errors_total",
           "legendFormat": "Errors",
           "refId": "E"
-        }
-      ]
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 3 },
-              { "color": "red", "value": 8 }
-            ]
-          },
-          "unit": "short"
-        }
-      },
-      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 20 },
-      "id": 10,
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "showThresholdLabels": false, "showThresholdMarkers": true },
-      "title": "SFU Workers",
-      "type": "gauge",
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "count(up{job=\"talktofriend\"}) or vector(0)",
-          "legendFormat": "Workers",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 100 },
-              { "color": "red", "value": 400 }
-            ]
-          },
-          "unit": "short"
-        }
-      },
-      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 20 },
-      "id": 11,
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "showThresholdLabels": false, "showThresholdMarkers": true },
-      "title": "SFU Routers (rooms in SFU mode)",
-      "type": "gauge",
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "ttf_rooms_active",
-          "legendFormat": "Routers",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": { "lineWidth": 2, "fillOpacity": 10 },
-          "unit": "ops"
-        }
-      },
-      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 20 },
-      "id": 12,
-      "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "list", "placement": "bottom" } },
-      "title": "Peer Join / Leave Rate",
-      "type": "timeseries",
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(ttf_peersJoined_total[2m])",
-          "legendFormat": "Joined/s",
-          "refId": "A"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(ttf_peersLeft_total[2m])",
-          "legendFormat": "Left/s",
-          "refId": "B"
-        }
-      ]
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": { "lineWidth": 2, "fillOpacity": 10 },
-          "unit": "ops"
-        }
-      },
-      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 20 },
-      "id": 13,
-      "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "list", "placement": "bottom" } },
-      "title": "Chat Persistence Rate",
-      "type": "timeseries",
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(ttf_chatPersisted_total[2m])",
-          "legendFormat": "Messages/s",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": { "lineWidth": 2, "fillOpacity": 10 },
-          "unit": "ops"
-        }
-      },
-      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 26 },
-      "id": 14,
-      "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "list", "placement": "bottom" } },
-      "title": "Mesh Signaling (Offer / Answer / ICE Relay Rates)",
-      "type": "timeseries",
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(ttf_offersRelayed_total[2m])",
-          "legendFormat": "Offers/s",
-          "refId": "A"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(ttf_answersRelayed_total[2m])",
-          "legendFormat": "Answers/s",
-          "refId": "B"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(ttf_iceRelayed_total[2m])",
-          "legendFormat": "ICE/s",
-          "refId": "C"
         }
       ]
     }

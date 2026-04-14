@@ -2,7 +2,7 @@ const { generateRoomCode } = require("./words");
 const db = require("./db");
 const limits = require("./limits");
 const metrics = require("./metrics");
-const logger = require("./logger");
+const logger = require("./logger").child({ module: "signaling" });
 const sfu = require("./sfu");
 
 // code -> { peers: Map<socketId, { name, ip, joinedAt }>, createdAt, hostIp, mode, sfuPeers }

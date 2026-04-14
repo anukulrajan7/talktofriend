@@ -14,7 +14,7 @@ const express = require("express");
 const pinoHttp = require("pino-http");
 const { Server } = require("socket.io");
 
-const logger = require("./logger");
+const logger = require("./logger").child({ module: "http" });
 const limits = require("./limits");
 const metrics = require("./metrics");
 const db = require("./db");
@@ -73,6 +73,7 @@ const io = new Server(server, {
       const allowed = [
         /^http:\/\/localhost(:\d+)?$/,
         /^https:\/\/([a-z0-9-]+\.)?talktofriend\.com$/,
+        /^https:\/\/([a-z0-9-]+\.)?talktofriend\.online$/,
       ];
       // Allow additional domains from env
       if (process.env.ALLOWED_ORIGINS) {

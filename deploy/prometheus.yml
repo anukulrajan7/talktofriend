@@ -1,8 +1,12 @@
 global:
   scrape_interval: 15s
+  evaluation_interval: 15s
 
 scrape_configs:
   - job_name: 'talktofriend'
+    # App runs on host network; monitoring on bridge network.
+    # host.docker.internal resolves to host via extra_hosts in compose.
     static_configs:
-      - targets: ['app:3000']
+      - targets: ['host.docker.internal:3000']
     metrics_path: '/metrics'
+    scrape_timeout: 10s

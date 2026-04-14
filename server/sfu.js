@@ -11,7 +11,8 @@
 
 const mediasoup = require("mediasoup");
 const os = require("os");
-const logger = require("./logger");
+const logger = require("./logger").child({ module: "sfu" });
+const metrics = require("./metrics");
 
 // How many CPU cores to dedicate to media processing.
 const NUM_WORKERS = process.env.MS_WORKERS
@@ -80,6 +81,7 @@ async function createWorkers() {
       // Remove from pool
       const idx = workers.indexOf(worker);
       if (idx !== -1) workers.splice(idx, 1);
+      metrics.setGauge("sfuWorkers", workers.length);
       // If no workers left, exit
       if (workers.length === 0) {
         logger.error("all workers dead — exiting");
@@ -88,6 +90,7 @@ async function createWorkers() {
     });
 
     workers.push(worker);
+    metrics.setGauge("sfuWorkers", workers.length);
     logger.info({ pid: worker.pid, index: i, total: NUM_WORKERS }, "mediasoup worker created");
   }
 }
@@ -107,6 +110,7 @@ async function getOrCreateRouter(roomCode) {
   const worker = getNextWorker();
   const router = await worker.createRouter({ mediaCodecs: MEDIA_CODECS });
   routers.set(roomCode, router);
+  metrics.setGauge("sfuRouters", routers.size);
   logger.info({ roomCode, workerId: worker.pid }, "router created");
   return router;
 }
@@ -116,6 +120,7 @@ function deleteRouter(roomCode) {
   if (router) {
     router.close();
     routers.delete(roomCode);
+    metrics.setGauge("sfuRouters", routers.size);
     logger.info({ roomCode }, "router closed");
   }
 }

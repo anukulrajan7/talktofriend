@@ -54,9 +54,8 @@ set +o allexport
 # Prompt for DOMAIN if not set or still placeholder
 if [ -z "${DOMAIN:-}" ] || [ "$DOMAIN" = "talk.example.com" ]; then
   echo ""
-  read -rp "Enter your domain name (e.g. talk.yourdomain.com) or press Enter for localhost: " DOMAIN_INPUT
+  read -rp "Enter your domain name (e.g. talktofriend.online) or press Enter for localhost: " DOMAIN_INPUT
   DOMAIN_INPUT="${DOMAIN_INPUT:-localhost}"
-  # Update in .env
   if grep -q "^DOMAIN=" "$ENV_FILE"; then
     sed -i.bak "s|^DOMAIN=.*|DOMAIN=${DOMAIN_INPUT}|" "$ENV_FILE" && rm -f "$ENV_FILE.bak"
   else
@@ -83,31 +82,31 @@ if [ -z "${GRAFANA_PASSWORD:-}" ] || [ "$GRAFANA_PASSWORD" = "changeme" ]; then
   fi
 fi
 
-# Warn if ANNOUNCED_IP is empty (mediasoup won't relay media without it)
+# Warn if ANNOUNCED_IP is empty
 if [ -z "${ANNOUNCED_IP:-}" ] || [ "${ANNOUNCED_IP:-}" = " " ]; then
-  warn "ANNOUNCED_IP is not set in .env — mediasoup WebRTC relay may not work."
+  warn "ANNOUNCED_IP is not set in .env — mediasoup WebRTC relay will NOT work."
   warn "Set it to your server's public IP address."
 fi
 
-# ---------- Build & start ----------
+# ---------- Build & start core app ----------
 
 echo ""
-info "Building Docker image..."
+info "Building app Docker image..."
 cd "$DEPLOY_DIR"
-docker compose build
+docker compose -f docker-compose.yml build
 
 echo ""
-info "Starting services..."
-docker compose up -d
+info "Starting app + Caddy..."
+docker compose -f docker-compose.yml up -d
 
 echo ""
 info "Waiting for app to become healthy..."
 ATTEMPTS=0
 MAX_ATTEMPTS=20
-until docker compose exec -T app node -e "require('http').get('http://localhost:3000/healthz', r => process.exit(r.statusCode === 200 ? 0 : 1))" &>/dev/null; do
+until curl -sf http://localhost:3000/healthz &>/dev/null; do
   ATTEMPTS=$((ATTEMPTS + 1))
   if [ $ATTEMPTS -ge $MAX_ATTEMPTS ]; then
-    warn "App health check timed out. Check logs: docker compose logs app"
+    warn "App health check timed out. Check logs: docker compose -f docker-compose.yml logs app"
     break
   fi
   sleep 3
@@ -116,6 +115,13 @@ done
 if [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; then
   success "App is healthy."
 fi
+
+# ---------- Start monitoring stack (separate) ----------
+
+echo ""
+info "Starting monitoring stack (Prometheus + Grafana + Uptime Kuma)..."
+docker compose -f docker-compose.monitoring.yml up -d
+success "Monitoring stack started."
 
 # ---------- Status ----------
 
@@ -131,13 +137,16 @@ if [ "$DOMAIN" = "localhost" ]; then
 else
   echo "  App:          https://${DOMAIN}"
   echo "  Metrics:      https://${DOMAIN}/metrics"
+  echo "  Grafana:      https://grafana.${DOMAIN}"
 fi
 
-echo "  Prometheus:   http://localhost:9090"
-echo "  Grafana:      http://localhost:3001  (admin / \${GRAFANA_PASSWORD})"
-echo "  Uptime Kuma:  http://localhost:3002"
 echo ""
-echo "  Logs:         docker compose logs -f"
-echo "  Stop:         docker compose down"
-echo "  Restart:      docker compose restart"
+echo "  Prometheus:   http://localhost:9090  (localhost only)"
+echo "  Grafana:      http://localhost:3001  (localhost only)"
+echo "  Uptime Kuma:  http://localhost:3002  (localhost only)"
+echo ""
+echo "  App logs:         docker compose -f docker-compose.yml logs -f"
+echo "  Monitoring logs:  docker compose -f docker-compose.monitoring.yml logs -f"
+echo "  Stop app:         docker compose -f docker-compose.yml down"
+echo "  Stop monitoring:  docker compose -f docker-compose.monitoring.yml down"
 echo ""

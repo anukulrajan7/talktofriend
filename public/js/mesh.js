@@ -224,8 +224,9 @@
               if (!params.encodings || params.encodings.length === 0) {
                 params.encodings = [{}];
               }
-              params.encodings[0].maxBitrate = 2500000;   // 2.5 Mbps for 1080p
+              params.encodings[0].maxBitrate = 4000000;   // 4 Mbps for crisp 1080p
               params.encodings[0].maxFramerate = 30;
+              params.degradationPreference = "maintain-resolution"; // prefer resolution over framerate
               sender.setParameters(params).catch(() => {});
             } catch (e) { /* older browsers */ }
           }

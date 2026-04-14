@@ -154,11 +154,15 @@ body {
 }
 .speaking { animation: speakPulse 1.4s ease-in-out infinite; }
 
-/* Video tile transitions */
+/* Video tile transitions — smooth enter/leave */
 .tile-enter { animation: tileIn 400ms cubic-bezier(0.16, 1, 0.3, 1) both; }
 .tile-leave { animation: tileOut 300ms ease both; }
 @keyframes tileIn  { from { opacity: 0; transform: scale(0.9) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
 @keyframes tileOut { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(0.9); } }
+
+/* Smooth grid layout transitions when peers join/leave */
+#grid { transition: all 400ms cubic-bezier(0.16, 1, 0.3, 1); }
+#grid .tile { transition: all 350ms cubic-bezier(0.16, 1, 0.3, 1); }
 
 /* Reaction float */
 .reaction {

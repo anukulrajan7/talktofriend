@@ -51,10 +51,16 @@ class MediaManager {
     this._audioTrack = this.localStream.getAudioTracks()[0] || null;
     this._videoTrack = this.localStream.getVideoTracks()[0] || null;
 
-    console.log('Media: local stream ready', {
-      audio: !!this._audioTrack,
-      video: !!this._videoTrack,
-    });
+    // Log actual video resolution for quality debugging
+    if (this._videoTrack) {
+      const settings = this._videoTrack.getSettings();
+      console.log('Media: local stream ready', {
+        audio: !!this._audioTrack,
+        video: `${settings.width}x${settings.height}@${settings.frameRate}fps`,
+      });
+    } else {
+      console.log('Media: local stream ready', { audio: !!this._audioTrack, video: false });
+    }
 
     return this.localStream;
   }

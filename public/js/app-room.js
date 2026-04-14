@@ -468,18 +468,23 @@ function room() {
         document.getElementById("grid").appendChild(tile);
       }
       const video = tile.querySelector("video");
-      video.srcObject = stream;
-      // Autoplay fix — some browsers block autoplay; retry on user interaction
-      const playPromise = video.play();
-      if (playPromise) {
-        playPromise.catch(() => {
-          // Autoplay blocked — play on next click anywhere
-          const handler = () => {
-            video.play().catch(() => {});
-            document.removeEventListener("click", handler);
-          };
-          document.addEventListener("click", handler, { once: true });
-        });
+
+      // FIX: skip srcObject reset if already set to the same stream.
+      // ontrack fires twice (audio + video) with the same stream object.
+      // Resetting srcObject causes a brief flicker/black frame.
+      if (video.srcObject !== stream) {
+        video.srcObject = stream;
+        // Autoplay fix — some browsers block autoplay; retry on user interaction
+        const playPromise = video.play();
+        if (playPromise) {
+          playPromise.catch(() => {
+            const handler = () => {
+              video.play().catch(() => {});
+              document.removeEventListener("click", handler);
+            };
+            document.addEventListener("click", handler, { once: true });
+          });
+        }
       }
       this.speakingDetector?.track(id, stream);
     },
@@ -513,23 +518,133 @@ function room() {
       video.className = "w-full h-full object-cover";
       tile.appendChild(video);
 
+      // Top-right badges container (quality + connection)
+      const badges = document.createElement("div");
+      badges.className = "absolute top-2 right-2 flex items-center gap-1.5 z-10";
+
+      // Quality badge (HD/SD)
+      const qBadge = document.createElement("div");
+      qBadge.className = "quality-badge text-[9px] font-bold px-1.5 py-0.5 rounded bg-black/50 text-dim hidden";
+      qBadge.dataset.quality = "";
+      badges.appendChild(qBadge);
+
+      // Connection quality dot
+      if (!isSelf) {
+        const dot = document.createElement("div");
+        dot.className = "conn-dot w-2 h-2 rounded-full bg-amber-500";
+        dot.title = "connecting";
+        badges.appendChild(dot);
+      }
+      tile.appendChild(badges);
+
       // Name label
       const label = document.createElement("div");
       label.className = "absolute bottom-2 left-2 text-xs text-white bg-black/50 px-2 py-0.5 rounded-md";
       label.textContent = isSelf ? `${name} (you)` : name;
       tile.appendChild(label);
 
+      // Monitor video resolution for quality badge
+      if (isSelf) {
+        video.addEventListener("resize", () => {
+          const h = video.videoHeight;
+          if (h >= 1080) this._setBadge(tile, "1080p", "text-ok");
+          else if (h >= 720) this._setBadge(tile, "HD", "text-brand-400");
+          else if (h >= 480) this._setBadge(tile, "SD", "text-amber-400");
+          else if (h > 0) this._setBadge(tile, `${h}p`, "text-danger");
+        });
+      }
+
       return tile;
+    },
+
+    _setBadge(tile, text, colorClass) {
+      const badge = tile.querySelector(".quality-badge");
+      if (!badge) return;
+      badge.textContent = text;
+      badge.className = `quality-badge text-[9px] font-bold px-1.5 py-0.5 rounded bg-black/50 ${colorClass}`;
     },
 
     _onPeerState(peerId, state) {
       if (this.peers[peerId]) {
         this.peers[peerId].state = state;
       }
+
+      // Update per-tile connection dot
+      const tile = document.querySelector(`[data-peer-id="${peerId}"]`);
+      const dot = tile?.querySelector(".conn-dot");
+      if (dot) {
+        if (state === "connected") {
+          dot.className = "conn-dot w-2 h-2 rounded-full bg-ok";
+          dot.title = "connected";
+          // Start monitoring bandwidth for this peer
+          this._startBandwidthMonitor(peerId);
+        } else if (state === "connecting" || state === "new") {
+          dot.className = "conn-dot w-2 h-2 rounded-full bg-amber-500 animate-pulse";
+          dot.title = "connecting";
+        } else if (state === "disconnected" || state === "failed") {
+          dot.className = "conn-dot w-2 h-2 rounded-full bg-danger";
+          dot.title = state;
+        }
+      }
+
+      // Update remote video quality badge when connected
+      if (state === "connected" && this.mesh) {
+        const entry = this.mesh.peers.get(peerId);
+        if (entry?.remoteStream && tile) {
+          const video = tile.querySelector("video");
+          if (video) {
+            video.addEventListener("resize", () => {
+              const h = video.videoHeight;
+              if (h >= 1080) this._setBadge(tile, "1080p", "text-ok");
+              else if (h >= 720) this._setBadge(tile, "HD", "text-brand-400");
+              else if (h >= 480) this._setBadge(tile, "SD", "text-amber-400");
+              else if (h > 0) this._setBadge(tile, `${h}p`, "text-danger");
+            }, { once: false });
+          }
+        }
+      }
+
       if (state === "connected") {
         this._updateStatus("ok", "connected");
       }
       this._updateConnQuality();
+    },
+
+    // Monitor bandwidth per peer — warn on low quality
+    _startBandwidthMonitor(peerId) {
+      if (!this.mesh) return;
+      const entry = this.mesh.peers.get(peerId);
+      if (!entry?.pc) return;
+
+      // Poll stats every 5s
+      const interval = setInterval(async () => {
+        if (!entry.pc || entry.pc.connectionState !== "connected") {
+          clearInterval(interval);
+          return;
+        }
+        try {
+          const stats = await entry.pc.getStats();
+          let totalBytesSent = 0, totalBytesRecv = 0;
+          stats.forEach(report => {
+            if (report.type === "outbound-rtp" && report.kind === "video") {
+              totalBytesSent = report.bytesSent || 0;
+            }
+            if (report.type === "inbound-rtp" && report.kind === "video") {
+              totalBytesRecv = report.bytesReceived || 0;
+              // Check for packet loss
+              const lost = report.packetsLost || 0;
+              const recv = report.packetsReceived || 1;
+              const lossRate = lost / (lost + recv);
+              if (lossRate > 0.1) {
+                this._showToast("unstable connection — video may freeze");
+              }
+            }
+          });
+        } catch (e) { clearInterval(interval); }
+      }, 5000);
+
+      // Store interval for cleanup
+      entry._statsInterval = interval;
     },
 
     _updateConnQuality() {

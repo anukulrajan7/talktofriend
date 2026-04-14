@@ -20,22 +20,19 @@
     { urls: "stun:stun1.l.google.com:19302" },
   ];
 
-  // Fetch TURN credentials from server (time-limited, secure)
-  async function fetchIceServers() {
+  // Fetch TURN credentials — returns a promise that resolves when ready
+  const iceReady = (async () => {
     try {
       const res = await fetch("/api/turn-credentials");
       const data = await res.json();
       if (data.iceServers && data.iceServers.length > 0) {
         ICE_SERVERS = data.iceServers;
-        console.log("[mesh] ICE servers loaded (STUN+TURN)");
+        console.log("[mesh] ICE servers loaded (STUN+TURN)", ICE_SERVERS.length, "servers");
       }
     } catch (e) {
       console.warn("[mesh] TURN credentials unavailable, using STUN only", e);
     }
-  }
-
-  // Fetch on load
-  fetchIceServers();
+  })();
 
   class MeshManager {
     constructor({ signaling, callbacks = {} }) {
@@ -61,7 +58,7 @@
       this._handlers.offer = async ({ from, sdp }) => {
         if (this._closed) return;
         try {
-          const pc = this._ensurePC(from);
+          const pc = await this._ensurePC(from);
           await pc.setRemoteDescription(new RTCSessionDescription(sdp));
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
@@ -124,9 +121,12 @@
       return this.peers.get(id);
     }
 
-    _ensurePC(peerId) {
+    async _ensurePC(peerId) {
       const entry = this._ensurePeer(peerId);
       if (entry.pc) return entry.pc;
+
+      // Wait for TURN credentials to be fetched before creating PeerConnection
+      await iceReady;
 
       const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
       entry.pc = pc;
@@ -174,7 +174,7 @@
     async _initiate(peerId) {
       try {
         const entry = this._ensurePeer(peerId);
-        const pc = this._ensurePC(peerId);
+        const pc = await this._ensurePC(peerId);
 
         // We initiate — we create the DataChannel
         const dc = pc.createDataChannel("chat", { ordered: true });

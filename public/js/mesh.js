@@ -14,10 +14,28 @@
 //   onStateChange(peerId, state)
 
 (function () {
-  const ICE_SERVERS = [
+  // Default STUN-only (overridden by server TURN credentials)
+  let ICE_SERVERS = [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
   ];
+
+  // Fetch TURN credentials from server (time-limited, secure)
+  async function fetchIceServers() {
+    try {
+      const res = await fetch("/api/turn-credentials");
+      const data = await res.json();
+      if (data.iceServers && data.iceServers.length > 0) {
+        ICE_SERVERS = data.iceServers;
+        console.log("[mesh] ICE servers loaded (STUN+TURN)");
+      }
+    } catch (e) {
+      console.warn("[mesh] TURN credentials unavailable, using STUN only", e);
+    }
+  }
+
+  // Fetch on load
+  fetchIceServers();
 
   class MeshManager {
     constructor({ signaling, callbacks = {} }) {

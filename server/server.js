@@ -51,6 +51,33 @@ app.get("/metrics", (_req, res) => {
   res.type("text/plain").send(metrics.prometheus());
 });
 
+// ---------- TURN credentials (time-limited via shared secret) ----------
+app.get("/api/turn-credentials", (_req, res) => {
+  const secret = process.env.TURN_SECRET;
+  if (!secret) return res.json({ iceServers: [] });
+
+  const ttl = 86400; // 24 hours
+  const timestamp = Math.floor(Date.now() / 1000) + ttl;
+  const username = `${timestamp}:talktofriend`;
+  const hmac = require("crypto").createHmac("sha1", secret);
+  hmac.update(username);
+  const credential = hmac.digest("base64");
+
+  const turnHost = process.env.TURN_HOST || process.env.ANNOUNCED_IP;
+
+  res.json({
+    iceServers: [
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:stun1.l.google.com:19302" },
+      {
+        urls: [`turn:${turnHost}:3478`, `turn:${turnHost}:3478?transport=tcp`],
+        username,
+        credential,
+      },
+    ],
+  });
+});
+
 // ---------- Chat history REST ----------
 app.get("/api/rooms/:code/chat", (req, res) => {
   const code = String(req.params.code || "").toLowerCase();

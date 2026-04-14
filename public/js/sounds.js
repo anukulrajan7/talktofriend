@@ -11,58 +11,46 @@ class Sounds {
     return this.ctx;
   }
 
-  // Subtle ascending chime for peer join
+  // Helper: play a chord (multiple notes simultaneously) — richer Discord-like sound
+  _playChord(freqs, duration = 0.3, volume = 0.04, type = "sine") {
+    try {
+      const ctx = this._ensureContext();
+      freqs.forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const filter = ctx.createBiquadFilter();
+        filter.type = "lowpass";
+        filter.frequency.value = 2000;
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.04);
+        gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.04);
+        gain.gain.linearRampToValueAtTime(volume, ctx.currentTime + i * 0.04 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.04 + duration);
+        osc.start(ctx.currentTime + i * 0.04);
+        osc.stop(ctx.currentTime + i * 0.04 + duration);
+      });
+    } catch (e) { /* ignore */ }
+  }
+
+  // Discord-style ascending chord for peer join
   join() {
     if (!this.enabled) return;
-    try {
-      const ctx = this._ensureContext();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.frequency.setValueAtTime(523, ctx.currentTime);       // C5
-      osc.frequency.setValueAtTime(659, ctx.currentTime + 0.1); // E5
-      gain.gain.setValueAtTime(0.08, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.3);
-    } catch (e) { /* ignore audio errors */ }
+    this._playChord([392, 523, 659], 0.35, 0.05); // G4 C5 E5 — major chord ascending
   }
 
-  // Subtle descending tone for peer leave
+  // Discord-style descending chord for peer leave
   leave() {
     if (!this.enabled) return;
-    try {
-      const ctx = this._ensureContext();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.frequency.setValueAtTime(659, ctx.currentTime);        // E5
-      osc.frequency.setValueAtTime(440, ctx.currentTime + 0.15); // A4
-      gain.gain.setValueAtTime(0.06, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.3);
-    } catch (e) { /* ignore audio errors */ }
+    this._playChord([659, 523, 392], 0.3, 0.04); // E5 C5 G4 — descending
   }
 
-  // Subtle tick for new chat message
+  // Soft pop for new chat message
   chat() {
     if (!this.enabled) return;
-    try {
-      const ctx = this._ensureContext();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(800, ctx.currentTime);
-      gain.gain.setValueAtTime(0.07, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.12);
-    } catch (e) { /* ignore audio errors */ }
+    this._playChord([880, 1047], 0.12, 0.05, "triangle"); // A5 C6 — quick pop
   }
 
   // Celebratory chime for emoji reactions
@@ -87,42 +75,16 @@ class Sounds {
     } catch (e) { /* ignore audio errors */ }
   }
 
-  // Audible feedback when mic is muted
+  // Mute — quick descending two-note (Discord style)
   mute() {
     if (!this.enabled) return;
-    try {
-      const ctx = this._ensureContext();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(440, ctx.currentTime);
-      osc.frequency.linearRampToValueAtTime(330, ctx.currentTime + 0.15);
-      gain.gain.setValueAtTime(0.07, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.2);
-    } catch (e) { /* ignore audio errors */ }
+    this._playChord([523, 392], 0.15, 0.06, "triangle"); // C5→G4 down
   }
 
-  // Audible feedback when mic is unmuted
+  // Unmute — quick ascending two-note
   unmute() {
     if (!this.enabled) return;
-    try {
-      const ctx = this._ensureContext();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(330, ctx.currentTime);
-      osc.frequency.linearRampToValueAtTime(440, ctx.currentTime + 0.15);
-      gain.gain.setValueAtTime(0.07, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.2);
-    } catch (e) { /* ignore audio errors */ }
+    this._playChord([392, 523], 0.15, 0.06, "triangle"); // G4→C5 up
   }
 
   // Soft low tone for errors

@@ -267,6 +267,35 @@ body {
   .grid-15, .grid-16, .grid-17, .grid-18, .grid-19, .grid-20 { grid-template-columns: repeat(3, 1fr); grid-auto-rows: 1fr; }
 }
 
+/* ─── Speaker/Pin View (screen share or double-click) ─── */
+#grid.has-pinned {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr auto;
+}
+#grid.has-pinned .tile.pinned {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  min-height: 0;
+}
+#grid.has-pinned .tile:not(.pinned) {
+  max-height: 120px;
+}
+/* Sidebar layout for pinned view on desktop */
+@media (min-width: 768px) {
+  #grid.has-pinned {
+    grid-template-columns: 1fr 200px;
+    grid-template-rows: 1fr;
+  }
+  #grid.has-pinned .tile.pinned {
+    grid-column: 1;
+    grid-row: 1 / -1;
+  }
+  #grid.has-pinned .tile:not(.pinned) {
+    grid-column: 2;
+    max-height: 160px;
+  }
+}
+
 /* ─── Control Buttons ─── */
 .ctrl {
   width: 48px; height: 48px;

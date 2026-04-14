@@ -483,11 +483,22 @@ function room() {
 
     _wireKeyboard() {
       document.addEventListener("keydown", (e) => {
-        if (["INPUT", "TEXTAREA"].includes(e.target.tagName)) return;
-        if (e.key === "m" || e.key === "M") this.toggleMute();
-        else if (e.key === "v" || e.key === "V") this.toggleCam();
-        else if (e.key === "s" || e.key === "S") this.toggleShare();
-        else if (e.key === "b" || e.key === "B") this.toggleBlur();
+        // Escape always blurs chat input — lets keyboard shortcuts work again
+        if (e.key === "Escape") {
+          document.activeElement?.blur();
+          return;
+        }
+
+        const inInput = ["INPUT", "TEXTAREA"].includes(e.target.tagName);
+
+        // When typing in chat, only handle shortcuts with modifier keys
+        if (inInput && !e.ctrlKey && !e.metaKey) return;
+
+        const key = e.key.toLowerCase();
+        if (key === "m") { e.preventDefault(); this.toggleMute(); }
+        else if (key === "v") { e.preventDefault(); this.toggleCam(); }
+        else if (key === "s" && !inInput) { e.preventDefault(); this.toggleShare(); }
+        else if (key === "b" && !inInput) { e.preventDefault(); this.toggleBlur(); }
       });
 
       // Auto-hide controls after 4s of inactivity (reappear on mouse/touch/key)
@@ -616,6 +627,19 @@ function room() {
       label.className = "absolute bottom-2 left-2 text-xs text-white bg-black/50 px-2 py-0.5 rounded-md z-10";
       label.textContent = isSelf ? `${name} (you)` : name;
       tile.appendChild(label);
+
+      // Double-click to pin/unpin tile (speaker view)
+      tile.addEventListener("dblclick", () => {
+        const grid = document.getElementById("grid");
+        if (tile.classList.contains("pinned")) {
+          tile.classList.remove("pinned");
+          grid.classList.remove("has-pinned");
+        } else {
+          grid.querySelectorAll(".tile.pinned").forEach(t => t.classList.remove("pinned"));
+          tile.classList.add("pinned");
+          grid.classList.add("has-pinned");
+        }
+      });
 
       // Monitor video resolution for quality badge
       if (isSelf) {
@@ -900,6 +924,13 @@ function room() {
       if (this.sharing) {
         await this.media.stopScreenShare();
         this.sharing = false;
+        // Unpin self tile when screen share stops
+        const grid = document.getElementById("grid");
+        const selfTile = document.querySelector('[data-peer-id="self"]');
+        if (selfTile?.classList.contains("pinned")) {
+          selfTile.classList.remove("pinned");
+          grid?.classList.remove("has-pinned");
+        }
 
         // In SFU mode, re-produce camera track after stopping screen share
         if (this.sfuClient && this.media.videoTrack) {
@@ -917,6 +948,14 @@ function room() {
         if (!screenTrack) return; // cancelled
 
         this.sharing = true;
+        // Auto-pin self tile when screen sharing (speaker view)
+        const grid = document.getElementById("grid");
+        const selfTile = document.querySelector('[data-peer-id="self"]');
+        if (selfTile && grid) {
+          grid.querySelectorAll(".tile.pinned").forEach(t => t.classList.remove("pinned"));
+          selfTile.classList.add("pinned");
+          grid.classList.add("has-pinned");
+        }
 
         if (this.sfuClient) {
           // SFU: produce screen track (replaces video producer)
@@ -940,10 +979,29 @@ function room() {
     },
 
     sendChat() {
-      if (!this.chatInput.trim()) return;
-      this.chat.send(this.chatInput);
+      const text = this.chatInput.trim();
+      if (!text) return;
+
+      // Chat commands — intercepted before sending to server
+      if (text.startsWith("/")) {
+        const cmd = text.toLowerCase();
+        if (cmd === "/rain") {
+          this.reactions?.confettiRain(4000);
+          this.chat.send("made it rain");
+        } else if (cmd === "/confetti" || cmd === "/party") {
+          this.reactions?._confettiBurst();
+          this.chat.send("party time");
+        } else if (cmd === "/wave") {
+          this.chat.send("👋");
+        } else {
+          // Unknown command — send as regular message
+          this.chat.send(text);
+        }
+      } else {
+        this.chat.send(text);
+      }
+
       this.chatInput = "";
-      // Reset unread when user sends
       this.unread = 0;
     },
   };

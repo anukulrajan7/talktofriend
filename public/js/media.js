@@ -25,6 +25,8 @@ class MediaManager {
   // Get camera + mic. Returns MediaStream.
   // Tries HD constraints first, falls back to SD on failure.
   async getLocalMedia(opts = {}) {
+    // Default 720p like Google Meet — good balance of quality vs CPU/bandwidth.
+    // 1080p causes frame drops on 4+ peer calls and overloads mobile devices.
     const constraints = {
       audio: opts.audio !== false ? {
         echoCancellation: true,
@@ -32,8 +34,8 @@ class MediaManager {
         autoGainControl: true,
       } : false,
       video: opts.video !== false ? {
-        width: { ideal: 1920, min: 640 },
-        height: { ideal: 1080, min: 480 },
+        width: { ideal: 1280, min: 640 },
+        height: { ideal: 720, min: 480 },
         frameRate: { ideal: 30, max: 30 },
         facingMode: 'user',
       } : false,
@@ -43,7 +45,7 @@ class MediaManager {
       this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
     } catch (e) {
       // Fallback: try lower resolution
-      console.warn('Media: HD failed, trying SD', e.message);
+      console.warn('Media: 720p failed, trying SD', e.message);
       constraints.video = opts.video !== false ? { width: 640, height: 480 } : false;
       this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
     }

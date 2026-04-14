@@ -630,13 +630,17 @@ function room() {
       this._updateConnQuality();
     },
 
-    // Monitor bandwidth per peer — warn on low quality
+    // Monitor bandwidth per peer — warn on low quality, suggest actions
     _startBandwidthMonitor(peerId) {
       if (!this.mesh) return;
       const entry = this.mesh.peers.get(peerId);
       if (!entry?.pc) return;
 
-      // Poll stats every 5s
+      let prevBytesRecv = 0;
+      let prevTimestamp = Date.now();
+      let lowBwCount = 0;
+      let warnedDisableVideo = false;
+
       const interval = setInterval(async () => {
         if (!entry.pc || entry.pc.connectionState !== "connected") {
           clearInterval(interval);
@@ -644,26 +648,52 @@ function room() {
         }
         try {
           const stats = await entry.pc.getStats();
-          let totalBytesSent = 0, totalBytesRecv = 0;
           stats.forEach(report => {
-            if (report.type === "outbound-rtp" && report.kind === "video") {
-              totalBytesSent = report.bytesSent || 0;
-            }
             if (report.type === "inbound-rtp" && report.kind === "video") {
-              totalBytesRecv = report.bytesReceived || 0;
-              // Check for packet loss
+              // Calculate receive bitrate
+              const now = Date.now();
+              const elapsed = (now - prevTimestamp) / 1000;
+              const bytesRecv = report.bytesReceived || 0;
+              const bitrate = elapsed > 0 ? ((bytesRecv - prevBytesRecv) * 8) / elapsed : 0;
+              prevBytesRecv = bytesRecv;
+              prevTimestamp = now;
+
+              // Check packet loss
               const lost = report.packetsLost || 0;
               const recv = report.packetsReceived || 1;
               const lossRate = lost / (lost + recv);
-              if (lossRate > 0.1) {
-                this._showToast("unstable connection — video may freeze");
+
+              // Update connection dot based on quality
+              const tile = document.querySelector(`[data-peer-id="${peerId}"]`);
+              const dot = tile?.querySelector(".conn-dot");
+              if (dot) {
+                if (lossRate > 0.05 || bitrate < 100000) {
+                  dot.className = "conn-dot w-2 h-2 rounded-full bg-danger";
+                  dot.title = `poor (${(bitrate/1000).toFixed(0)}kbps, ${(lossRate*100).toFixed(1)}% loss)`;
+                } else if (lossRate > 0.02 || bitrate < 300000) {
+                  dot.className = "conn-dot w-2 h-2 rounded-full bg-amber-400";
+                  dot.title = `fair (${(bitrate/1000).toFixed(0)}kbps)`;
+                } else {
+                  dot.className = "conn-dot w-2 h-2 rounded-full bg-ok";
+                  dot.title = `good (${(bitrate/1000).toFixed(0)}kbps)`;
+                }
+              }
+
+              // Warn on sustained poor quality
+              if (bitrate > 0 && bitrate < 150000) {
+                lowBwCount++;
+                if (lowBwCount >= 3 && !warnedDisableVideo) {
+                  this._showToast("poor connection — consider turning off video");
+                  warnedDisableVideo = true;
+                }
+              } else {
+                lowBwCount = Math.max(0, lowBwCount - 1);
               }
             }
           });
         } catch (e) { clearInterval(interval); }
-      }, 5000);
+      }, 3000);
 
-      // Store interval for cleanup
       entry._statsInterval = interval;
     },
 

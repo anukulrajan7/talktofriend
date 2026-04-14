@@ -211,24 +211,35 @@
         this.cb.onStateChange?.(peerId, pc.connectionState);
       };
 
-      // Add local tracks with quality constraints
-      console.log(`[mesh] localStream for ${peerId}:`, this.localStream ? `${this.localStream.getTracks().length} tracks` : 'NULL');
+      // Add local tracks with adaptive quality (like Google Meet)
+      // Bitrate scales DOWN as more peers join — more connections = more CPU/bandwidth
+      const peerCount = this.peers.size;
+      const videoBitrate = peerCount <= 1 ? 1500000   // 1.5 Mbps for 2 people (720p crisp)
+                         : peerCount <= 2 ? 1000000   // 1.0 Mbps for 3 people
+                         :                   600000;  // 600 kbps for 4 people
+      console.log(`[mesh] localStream for ${peerId}:`, this.localStream ? `${this.localStream.getTracks().length} tracks` : 'NULL',
+                   `| bitrate=${(videoBitrate/1000000).toFixed(1)}Mbps (${peerCount+1} peers)`);
+
       if (this.localStream) {
         this.localStream.getTracks().forEach((track) => {
           const sender = pc.addTrack(track, this.localStream);
           if (track.kind === "video") {
             entry.videoSender = sender;
-            // Set video encoding quality
             try {
               const params = sender.getParameters();
               if (!params.encodings || params.encodings.length === 0) {
                 params.encodings = [{}];
               }
-              params.encodings[0].maxBitrate = 4000000;   // 4 Mbps for crisp 1080p
+              params.encodings[0].maxBitrate = videoBitrate;
               params.encodings[0].maxFramerate = 30;
-              params.degradationPreference = "maintain-resolution"; // prefer resolution over framerate
+              // "balanced" = encoder adapts BOTH resolution and framerate on congestion
+              // "maintain-resolution" forces frame drops instead — causes flickering
+              params.degradationPreference = "balanced";
               sender.setParameters(params).catch(() => {});
             } catch (e) { /* older browsers */ }
+
+            // Set content hint so encoder optimizes for face video
+            try { track.contentHint = "motion"; } catch (e) {}
           }
           if (track.kind === "audio") {
             try {

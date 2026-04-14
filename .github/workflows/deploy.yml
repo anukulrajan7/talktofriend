@@ -1,10 +1,9 @@
 # CI/CD pipeline for TalkToFriend
 #
 # Required GitHub Secrets:
-#   VPS_HOST      — VPS IP address
-#   VPS_USER      — SSH username (usually root)
-#   VPS_SSH_KEY   — Private SSH key
-#   VPS_PORT      — SSH port (default 22)
+#   HOSTINGER_API_KEY — Hostinger API key (hPanel → API settings)
+# Required GitHub Variables:
+#   HOSTINGER_VM_ID   — VPS ID (e.g. 1425344)
 
 name: Deploy
 
@@ -47,7 +46,7 @@ jobs:
       - name: Syntax check — client files
         run: node --check public/js/app-room.js public/js/chat.js public/js/media.js public/js/mesh.js public/js/reactions.js public/js/sfu-client.js public/js/signaling.js public/js/sounds.js public/js/speaking-detector.js public/sw.js
 
-  # ── Job 2: Deploy ────────────────────────────────────────────
+  # ── Job 2: Deploy via Hostinger API (no SSH needed) ──────────
   deploy:
     name: Deploy to VPS
     runs-on: ubuntu-latest
@@ -57,32 +56,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1
+      - name: Deploy to Hostinger VPS
+        uses: hostinger/deploy-on-vps@v2
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT }}
-          script: |
-            set -e
-
-            cd /root/talktofriend
-
-            # Force-sync to latest main (safe — VPS has no local edits to keep)
-            git fetch origin main
-            git reset --hard origin/main
-
-            # Rebuild and restart app only (monitoring managed separately)
-            cd deploy
-            docker compose build
-            docker compose up -d
-
-            docker compose ps
-
-            # Health check (app on PORT from .env, default 3100)
-            echo "Waiting for app to be healthy..."
-            sleep 8
-            curl -f http://127.0.0.1:3100/healthz || exit 1
-
-            echo "Deploy complete."
+          api-key: ${{ secrets.HOSTINGER_API_KEY }}
+          virtual-machine: ${{ vars.HOSTINGER_VM_ID }}

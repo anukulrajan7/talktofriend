@@ -207,6 +207,7 @@
           <p class="appear appear-5 text-[11px] text-mute mt-4 hidden sm:block">
             <kbd class="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 font-mono text-[10px]">M</kbd> mute ·
             <kbd class="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 font-mono text-[10px]">V</kbd> camera ·
+            <kbd class="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 font-mono text-[10px]">B</kbd> blur ·
             <kbd class="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 font-mono text-[10px]">S</kbd> share
           </p>
         </div>
@@ -253,7 +254,10 @@
 </div>
 
 <!-- ─── FLOATING PILL CONTROL BAR ─── -->
-<footer class="fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-40" data-test="controls">
+<footer class="fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-40 transition-opacity duration-500"
+        :class="controlsVisible ? 'opacity-100' : 'opacity-0 pointer-events-none hover:opacity-100 hover:pointer-events-auto'"
+        @mouseenter="controlsVisible = true"
+        data-test="controls">
   <div class="glass-strong rounded-full px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-1.5 sm:gap-2 shadow-2xl shadow-black/50 border border-white/10">
 
     <button @click="toggleMute()"

@@ -24,6 +24,8 @@ function room() {
     showDebug: new URLSearchParams(location.search).has("debug") || location.hostname === "localhost",
     blurEnabled: false,
     _bgProcessor: null,
+    controlsVisible: true,
+    _controlsTimer: null,
 
     // Instances
     media: null,
@@ -463,6 +465,19 @@ function room() {
         else if (e.key === "b" || e.key === "B") this.toggleBlur();
       });
 
+      // Auto-hide controls after 4s of inactivity (reappear on mouse/touch/key)
+      const resetControlsTimer = () => {
+        this.controlsVisible = true;
+        clearTimeout(this._controlsTimer);
+        this._controlsTimer = setTimeout(() => {
+          if (this.peerCount > 1) this.controlsVisible = false;
+        }, 4000);
+      };
+      document.addEventListener("mousemove", resetControlsTimer);
+      document.addEventListener("touchstart", resetControlsTimer);
+      document.addEventListener("keydown", resetControlsTimer);
+      resetControlsTimer();
+
       window.addEventListener("beforeunload", () => {
         this.media?.close();
         this.mesh?.close();
@@ -564,9 +579,16 @@ function room() {
       }
       tile.appendChild(badges);
 
+      // Cam-off avatar (shows initials when video is off)
+      const avatar = document.createElement("div");
+      const initials = (name || "?").split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+      avatar.className = "cam-off-avatar absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 transition-opacity duration-300";
+      avatar.innerHTML = `<div class="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-brand-500/20 border border-brand-400/30 flex items-center justify-center text-2xl sm:text-3xl font-semibold text-brand-400">${initials}</div>`;
+      tile.appendChild(avatar);
+
       // Name label
       const label = document.createElement("div");
-      label.className = "absolute bottom-2 left-2 text-xs text-white bg-black/50 px-2 py-0.5 rounded-md";
+      label.className = "absolute bottom-2 left-2 text-xs text-white bg-black/50 px-2 py-0.5 rounded-md z-10";
       label.textContent = isSelf ? `${name} (you)` : name;
       tile.appendChild(label);
 

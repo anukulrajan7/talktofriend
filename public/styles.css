@@ -173,9 +173,11 @@ body {
   -webkit-backface-visibility: hidden;
   background: #12121a; /* dark bg prevents white flash on blank frames */
 }
-/* Camera-off state: smooth fade to dark instead of abrupt black */
-#grid .tile.cam-off video { opacity: 0.05; transition: opacity 300ms ease; }
+/* Camera-off state: smooth fade to dark + show avatar initials */
+#grid .tile.cam-off video { opacity: 0; transition: opacity 300ms ease; }
 #grid .tile:not(.cam-off) video { opacity: 1; transition: opacity 300ms ease; }
+#grid .tile.cam-off .cam-off-avatar { opacity: 1; }
+#grid .tile:not(.cam-off) .cam-off-avatar { opacity: 0; }
 
 /* Reaction float */
 .reaction {

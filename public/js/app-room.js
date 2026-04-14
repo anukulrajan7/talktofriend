@@ -320,6 +320,18 @@ function room() {
         if (tile) tile.classList.toggle("cam-off", camOff);
       });
 
+      // Remote screen share — auto-pin the sharer's tile for all viewers
+      this.signaling.on("screen-share", ({ id, sharing }) => {
+        if (sharing) {
+          this.pinnedPeerId = id;
+          this._syncPinnedTiles();
+          this._showToast(`${this.peers[id]?.name || "friend"} is sharing`);
+        } else if (this.pinnedPeerId === id) {
+          this.pinnedPeerId = null;
+          this._syncPinnedTiles();
+        }
+      });
+
       this.signaling.on("error-msg", ({ message }) => {
         // Don't show fatal overlay for "already in room" during reconnect race
         if (message === "You're already in a room.") {
@@ -427,6 +439,14 @@ function room() {
                   if (tile) {
                     tile.className = tile.className.replace(/\bframe-\w+/g, "").trim();
                     if (msg.frame && msg.frame !== "frame-none") tile.classList.add(msg.frame);
+                  }
+                } else if (msg.type === "screen-share") {
+                  if (msg.sharing) {
+                    this.pinnedPeerId = id;
+                    this._syncPinnedTiles();
+                  } else if (this.pinnedPeerId === id) {
+                    this.pinnedPeerId = null;
+                    this._syncPinnedTiles();
                   }
                 }
               } catch {}
@@ -705,17 +725,17 @@ function room() {
       // Resetting srcObject causes a brief flicker/black frame.
       if (video.srcObject !== stream) {
         video.srcObject = stream;
-        // Autoplay fix — some browsers block autoplay; retry on user interaction
-        const playPromise = video.play();
-        if (playPromise) {
-          playPromise.catch(() => {
-            const handler = () => {
-              video.play().catch(() => {});
-              document.removeEventListener("click", handler);
-            };
-            document.addEventListener("click", handler, { once: true });
-          });
-        }
+        // Autoplay fix — retry on user interaction if browser blocks audio/video
+        video.play().then(() => {
+          console.log(`[tile] ${id} playing`);
+        }).catch(() => {
+          console.warn(`[tile] ${id} autoplay blocked, will retry on interaction`);
+          const retry = () => { video.play().catch(() => {}); };
+          document.addEventListener("click", retry, { once: true });
+          document.addEventListener("touchstart", retry, { once: true });
+          // Also show a toast so user knows to tap
+          this._showToast("tap anywhere to hear audio");
+        });
       }
       this.speakingDetector?.track(id, stream);
       // Apply pending cam-off state for late joiners
@@ -766,6 +786,9 @@ function room() {
       video.autoplay = true;
       video.playsInline = true;
       if (isSelf) video.muted = true;
+      // Low-latency audio/video — prevents browser buffering that causes lip-sync drift
+      if (video.latencyMode !== undefined) video.latencyMode = "realtime";
+      video.volume = 1.0;
       // Anti-flicker: GPU compositing + dark bg prevents white/transparent flash
       // Mirror self-video like every video call app (prevents disorientation)
       video.className = "w-full h-full object-cover";
@@ -1109,6 +1132,11 @@ function room() {
           this.pinnedPeerId = null;
           this._syncPinnedTiles();
         }
+        // Tell peers to unpin
+        this.signaling.socket.emit("screen-share", { sharing: false });
+        if (this.mesh) {
+          this.mesh.broadcastDataChannel(JSON.stringify({ type: "screen-share", sharing: false }));
+        }
 
         // In SFU mode, re-produce camera track after stopping screen share
         if (this.sfuClient && this.media.videoTrack) {
@@ -1129,6 +1157,11 @@ function room() {
         // Auto-pin self tile when screen sharing (speaker view)
         this.pinnedPeerId = "self";
         this._syncPinnedTiles();
+        // Broadcast to peers so they auto-pin the sharer
+        this.signaling.socket.emit("screen-share", { sharing: true });
+        if (this.mesh) {
+          this.mesh.broadcastDataChannel(JSON.stringify({ type: "screen-share", sharing: true }));
+        }
 
         if (this.sfuClient) {
           // SFU: produce screen track (replaces video producer)

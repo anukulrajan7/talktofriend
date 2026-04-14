@@ -390,6 +390,13 @@ function attach(io) {
       metrics.inc("answersRelayed");
     }));
 
+    // Screen share state broadcast — relay to room so peers auto-pin the sharer
+    socket.on("screen-share", withMsgLimit(({ sharing }) => {
+      const code = socket.roomCode;
+      if (!code) return;
+      socket.to(code).emit("screen-share", { id: socket.id, sharing: !!sharing });
+    }));
+
     // Camera state broadcast — relay to all peers in room
     socket.on("cam-state", withMsgLimit(({ camOff }) => {
       const code = socket.roomCode;

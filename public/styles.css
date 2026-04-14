@@ -234,7 +234,7 @@ body::after {
 #grid .tile {
   transition: opacity 350ms cubic-bezier(0.16, 1, 0.3, 1),
               transform 350ms cubic-bezier(0.16, 1, 0.3, 1);
-  contain: strict; /* full isolation — prevents cross-tile reflow during grid changes */
+  contain: layout style paint; /* isolate repaints without size containment (tiles sized by grid) */
 }
 /* Force GPU compositing on all video elements — eliminates software paint flicker */
 #grid video {
@@ -242,8 +242,7 @@ body::after {
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
   background: #12121a; /* dark bg prevents white flash on blank frames */
-  contain: strict;
-  content-visibility: auto;
+  contain: layout paint; /* no size containment — video sized by parent tile */
 }
 /* Camera-off state: smooth fade to dark + show avatar initials */
 #grid .tile.cam-off video { opacity: 0; transition: opacity 300ms ease; }

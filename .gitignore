@@ -48,3 +48,20 @@ npm-debug.log*
 # Coverage
 coverage/
 .nyc_output/
+
+# Chrome DevTools traces & screenshots
+Trace-*.json
+*.png
+!public/**/*.png
+!deploy/**/*.png
+
+# Test artifacts
+playwright-report/
+test-results/
+*.spec.js-snapshots/
+
+# Build artifacts
+sfu/sfu
+
+# Load tests output
+load-tests/

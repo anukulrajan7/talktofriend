@@ -264,7 +264,7 @@
               if (!params.encodings || params.encodings.length === 0) {
                 params.encodings = [{}];
               }
-              params.encodings[0].maxBitrate = 64000;
+              params.encodings[0].maxBitrate = 128000; // 128kbps — clear voice quality (Opus handles this well)
               sender.setParameters(params).catch(() => {});
             } catch (e) {}
           }

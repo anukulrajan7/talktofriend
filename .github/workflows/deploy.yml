@@ -69,8 +69,9 @@ jobs:
 
             cd /root/talktofriend
 
-            # Pull latest code
-            git pull origin main
+            # Force-sync to latest main (safe — VPS has no local edits to keep)
+            git fetch origin main
+            git reset --hard origin/main
 
             # Rebuild and restart app only (monitoring managed separately)
             cd deploy

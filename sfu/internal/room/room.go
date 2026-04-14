@@ -120,6 +120,13 @@ func (r *Room) forwardTrack(producerID string, remoteTrack *webrtc.TrackRemote) 
 	}()
 }
 
+// GetPeer returns a peer by ID, or nil if not found.
+func (r *Room) GetPeer(id string) *peer.Peer {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.peers[id]
+}
+
 // PeerCount returns the number of peers in the room.
 func (r *Room) PeerCount() int {
 	r.mu.RLock()

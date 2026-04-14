@@ -4,6 +4,13 @@ const limits = require("./limits");
 const metrics = require("./metrics");
 const logger = require("./logger").child({ module: "signaling" });
 const sfu = require("./sfu");
+const goSfu = process.env.SFU_BACKEND === "go" ? require("./go-sfu-bridge") : null;
+
+if (goSfu) {
+  logger.info({ url: goSfu.SFU_URL }, "SFU backend: Go (Pion)");
+} else {
+  logger.info("SFU backend: mediasoup (default)");
+}
 
 // code -> { peers: Map<socketId, { name, ip, joinedAt }>, createdAt, hostIp, mode, sfuPeers }
 // mode: 'mesh' | 'sfu'
@@ -248,9 +255,14 @@ function attach(io) {
         room.mode = "upgrading"; // intermediate state — prevents concurrent upgrades
 
         try {
-          const router = await sfu.getOrCreateRouter(code);
-          const rtpCapabilities = router.rtpCapabilities;
+          // Create SFU room in the active backend
+          if (goSfu) {
+            await goSfu.createRoom(code);
+          }
+          const router = goSfu ? null : await sfu.getOrCreateRouter(code);
+          const rtpCapabilities = router ? router.rtpCapabilities : {};
           room.mode = "sfu"; // set AFTER router is ready
+          room.sfuBackend = goSfu ? "go" : "mediasoup";
 
           logger.info({ code, peers: room.peers.size }, "room upgraded to SFU mode");
           // FIX: Use socket.to() instead of io.to() — the triggering peer gets
@@ -590,9 +602,13 @@ function cleanup(socket, io, reason) {
       socket.to(code).emit("peer-left", { id: socket.id });
 
       if (room.peers.size === 0) {
-        // Clean up SFU router if in SFU mode
+        // Clean up SFU resources
         if (room.mode === "sfu") {
-          sfu.deleteRouter(code);
+          if (room.sfuBackend === "go" && goSfu) {
+            goSfu.deleteRoom(code).catch(() => {});
+          } else {
+            sfu.deleteRouter(code);
+          }
         }
 
         rooms.delete(code);

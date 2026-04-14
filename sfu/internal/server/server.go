@@ -272,23 +272,109 @@ func (s *Server) handleOffer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get the peer
-	_ = rm
-	_ = peerID
+	p := rm.GetPeer(peerID)
+	if p == nil {
+		writeJSON(w, 404, map[string]any{"error": "peer not found"})
+		return
+	}
 
-	// For now, this is a placeholder — full SDP exchange will be wired
-	// when we integrate with Node.js signaling
-	writeJSON(w, 200, map[string]any{"ok": true, "status": "placeholder"})
+	offer := webrtc.SessionDescription{
+		Type: webrtc.SDPTypeOffer,
+		SDP:  body.SDP,
+	}
+
+	answer, err := p.CreateAnswer(offer)
+	if err != nil {
+		s.log.Error("SDP answer failed", "peer", peerID, "err", err)
+		writeJSON(w, 500, map[string]any{"error": "SDP negotiation failed"})
+		return
+	}
+
+	s.log.Info("SDP exchange complete", "room", code, "peer", peerID)
+	writeJSON(w, 200, map[string]any{
+		"sdp":  answer.SDP,
+		"type": answer.Type.String(),
+	})
 }
 
 func (s *Server) handleAnswer(w http.ResponseWriter, r *http.Request) {
-	// Placeholder — will receive SDP answer from client via Node.js
-	writeJSON(w, 200, map[string]any{"ok": true, "status": "placeholder"})
+	code := r.PathValue("code")
+	peerID := r.PathValue("id")
+
+	var body struct {
+		SDP  string `json:"sdp"`
+		Type string `json:"type"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeJSON(w, 400, map[string]any{"error": "invalid JSON"})
+		return
+	}
+
+	s.mu.RLock()
+	rm, exists := s.rooms[code]
+	s.mu.RUnlock()
+	if !exists {
+		writeJSON(w, 404, map[string]any{"error": "room not found"})
+		return
+	}
+
+	p := rm.GetPeer(peerID)
+	if p == nil {
+		writeJSON(w, 404, map[string]any{"error": "peer not found"})
+		return
+	}
+
+	err := p.SetRemoteDescription(webrtc.SessionDescription{
+		Type: webrtc.SDPTypeAnswer,
+		SDP:  body.SDP,
+	})
+	if err != nil {
+		writeJSON(w, 500, map[string]any{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, 200, map[string]any{"ok": true})
 }
 
 func (s *Server) handleICE(w http.ResponseWriter, r *http.Request) {
-	// Placeholder — will receive ICE candidates from client via Node.js
-	writeJSON(w, 200, map[string]any{"ok": true, "status": "placeholder"})
+	code := r.PathValue("code")
+	peerID := r.PathValue("id")
+
+	var body struct {
+		Candidate     string `json:"candidate"`
+		SDPMid        string `json:"sdpMid"`
+		SDPMLineIndex uint16 `json:"sdpMLineIndex"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeJSON(w, 400, map[string]any{"error": "invalid JSON"})
+		return
+	}
+
+	s.mu.RLock()
+	rm, exists := s.rooms[code]
+	s.mu.RUnlock()
+	if !exists {
+		writeJSON(w, 404, map[string]any{"error": "room not found"})
+		return
+	}
+
+	p := rm.GetPeer(peerID)
+	if p == nil {
+		writeJSON(w, 404, map[string]any{"error": "peer not found"})
+		return
+	}
+
+	err := p.AddICECandidate(webrtc.ICECandidateInit{
+		Candidate:     body.Candidate,
+		SDPMid:        &body.SDPMid,
+		SDPMLineIndex: &body.SDPMLineIndex,
+	})
+	if err != nil {
+		writeJSON(w, 500, map[string]any{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, 200, map[string]any{"ok": true})
 }
 
 // ── Helpers ──────────────────────────────────────────────────

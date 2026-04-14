@@ -7,15 +7,19 @@ Video calls for up to 20 people — P2P for small groups, SFU for larger ones. N
 ## Features
 
 - Up to 20 people per room
-- P2P mesh for small calls (2-4), mediasoup SFU for larger (5-20)
-- Auto-switch between modes as people join/leave
+- P2P mesh for small calls (2-4), SFU for larger (5-20)
+- Dual SFU backends: **mediasoup** (default) or **Go/Pion** (`SFU_BACKEND=go`)
+- Auto-switch between mesh and SFU as people join/leave
+- 1080p video (HD fallback) with adaptive bitrate caps (2.5 Mbps video, 64 kbps audio)
+- ICE restart on connection failure + TURN relay support
 - Screen share with PiP self-preview
 - In-call chat (persisted per room, auto-cleaned)
 - Reactions + confetti
 - Keyboard shortcuts: M (mute), V (camera), S (screen share)
 - Room codes like `happy-tiger-42` — no login needed
 - Prometheus metrics + Grafana dashboard
-- Docker deploy with Caddy HTTPS
+- Docker deploy with Traefik HTTPS
+- Load tested: 1500 concurrent connections, 500 rooms, zero errors
 
 ## Quick Start (local dev)
 
@@ -43,7 +47,7 @@ cp .env.example .env
 bash deploy/deploy.sh
 ```
 
-That script pulls images, runs docker-compose, and sets up Caddy with automatic HTTPS. Your instance will be live at the domain you set.
+That script pulls images, runs docker-compose, and sets up Traefik with automatic HTTPS. Your instance will be live at the domain you set.
 
 Manual alternative:
 
@@ -65,6 +69,10 @@ docker-compose up -d
 | `MAX_PEOPLE_PER_ROOM` | `20` | Hard cap per room |
 | `MAX_TOTAL_ROOMS` | `500` | Server-wide room limit |
 | `MAX_TOTAL_SOCKETS` | `2000` | Max concurrent connections |
+| `SFU_BACKEND` | `mediasoup` | SFU backend: `mediasoup` (default) or `go` (Pion) |
+| `GO_SFU_URL` | `http://127.0.0.1:3200` | Go SFU service URL (when `SFU_BACKEND=go`) |
+| `TURN_SECRET` | — | HMAC secret for TURN credential generation |
+| `TURN_SERVER` | — | TURN server URL (e.g. `turn:your-server:3478`) |
 | `GRAFANA_PASSWORD` | `changeme` | Grafana admin password — change this |
 | `TELEGRAM_BOT_TOKEN` | — | Optional: alert bot token |
 | `TELEGRAM_CHAT_ID` | — | Optional: Telegram chat for alerts |
@@ -86,17 +94,26 @@ See `docs/monitoring-setup.md` for full guide and `docs/deploy-runbook.md` for d
 
 ## Tech Stack
 
-- Node.js + Express — HTTP server
-- Socket.IO — signaling and chat
-- mediasoup — WebRTC SFU for larger calls
+- Node.js + Express — HTTP server + signaling
+- Socket.IO — real-time signaling and chat
+- mediasoup — WebRTC SFU for larger calls (default)
+- Go + Pion — optional lightweight SFU backend
+- coturn — TURN relay server for NAT traversal
 - SQLite — chat persistence
 - Tailwind CSS + Alpine.js — frontend
+- Traefik — reverse proxy with automatic HTTPS
+- Prometheus + Grafana — metrics and dashboards
 
 ## Architecture
 
-Calls with 2-4 people run as a P2P mesh — browsers connect directly, no media touches the server. At 5+ people the server switches to a mediasoup SFU, where each client sends one stream up and the server fans it out. The switch happens automatically as people join or leave.
+```
+2-4 peers: Browser ←→ Browser (P2P mesh, direct WebRTC)
+5-20 peers: Browser → SFU → Browser (server-mediated, one upload per peer)
+```
 
-The Node.js server handles signaling (room join/leave, SDP negotiation) and chat. mediasoup handles media forwarding for larger rooms.
+Calls with 2-4 people run as a P2P mesh — browsers connect directly, no media touches the server. At 5+ people the server switches to an SFU (mediasoup or Go/Pion), where each client sends one stream up and the server fans it out. The switch happens automatically as people join or leave.
+
+The Node.js server handles signaling (room join/leave, SDP/ICE relay) and chat. TURN credentials are generated server-side with HMAC signing for secure NAT traversal. Video is capped at 1080p/2.5 Mbps with automatic fallback to lower resolutions.
 
 ## License
 

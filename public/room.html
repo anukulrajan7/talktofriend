@@ -354,6 +354,37 @@
   </div>
 </footer>
 
+<!-- ─── DEBUG PANEL (visible in dev mode or ?debug=1) ─── -->
+<div x-show="showDebug" x-cloak
+     class="fixed top-14 right-2 z-50 bg-black/90 text-green-400 font-mono text-[10px] p-2 rounded-lg max-w-xs overflow-auto max-h-60 border border-green-900"
+     x-data="{ collapsed: false }">
+  <div class="flex justify-between items-center mb-1">
+    <span class="text-green-300 font-bold">DEBUG</span>
+    <button @click="collapsed = !collapsed" class="text-green-600 cursor-pointer" x-text="collapsed ? '+' : '-'"></button>
+  </div>
+  <div x-show="!collapsed">
+    <div>socket: <span x-text="myId ? myId.slice(0,10) : 'none'" class="text-yellow-400"></span></div>
+    <div>room: <span x-text="code || 'none'" class="text-yellow-400"></span></div>
+    <div>mode: <span x-text="roomMode" class="text-yellow-400"></span></div>
+    <div>peers: <span x-text="peerCount" class="text-yellow-400"></span></div>
+    <div>conn: <span x-text="connState" class="text-yellow-400"></span></div>
+    <div>mesh: <span x-text="mesh ? 'yes (peers=' + mesh.peers.size + ')' : 'no'" class="text-yellow-400"></span></div>
+    <div>localStream: <span x-text="media?.localStream ? media.localStream.getTracks().length + ' tracks' : 'none'" class="text-yellow-400"></span></div>
+    <div>tiles: <span x-text="document.querySelectorAll('#grid [data-peer-id]').length" class="text-yellow-400"></span></div>
+    <template x-if="mesh && mesh.peers.size > 0">
+      <div class="mt-1 border-t border-green-900 pt-1">
+        <template x-for="[id, entry] of mesh.peers" :key="id">
+          <div class="truncate">
+            <span x-text="id.slice(0,8)" class="text-blue-400"></span>:
+            <span x-text="entry.pc?.iceConnectionState || 'no-pc'" class="text-yellow-400"></span>
+            <span x-text="entry.remoteStream ? '(stream:' + entry.remoteStream.getTracks().length + ')' : '(no-stream)'" class="text-gray-500"></span>
+          </div>
+        </template>
+      </div>
+    </template>
+  </div>
+</div>
+
 <!-- ─── TOAST ─── -->
 <div x-show="toast"
      x-transition

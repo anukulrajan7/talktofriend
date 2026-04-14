@@ -21,6 +21,7 @@ function room() {
     toast: "",
     unread: 0,
     overlay: { show: false, title: "", body: "", emoji: "", dismissable: true },
+    showDebug: new URLSearchParams(location.search).has("debug") || location.hostname === "localhost",
 
     // Instances
     media: null,
@@ -34,6 +35,7 @@ function room() {
 
     // Guards — _initialized stays true forever after first connect
     _initialized: false,
+    _connectInProgress: false, // prevent re-entrant connect handler
 
     // Connection quality
     connQuality: "waiting",
@@ -95,44 +97,75 @@ function room() {
       this.signaling.socket.on("connect", async () => {
         console.log("SOCKET CONNECTED", this.mode, this.code);
 
-        // --- Reconnection path ---
-        if (this._initialized) {
-          console.log("Reconnection detected, cleaning up and re-joining");
-          this._cleanupForRejoin();
-          if (this.code) {
-            this.signaling.joinRoom(this.code, this.name);
-          }
+        // FIX: guard against re-entrant connect handler.
+        // Socket.IO can fire "connect" twice during transport upgrade.
+        // Without this guard, the second fires the reconnection path
+        // while getLocalMedia() is still awaiting, causing null localStream.
+        if (this._connectInProgress) {
+          console.log("Connect handler already in progress, skipping duplicate");
           return;
         }
-
-        // --- First connection path ---
-        this._initialized = true;
+        this._connectInProgress = true;
 
         try {
-          const stream = await this.media.getLocalMedia();
-          this._addLocalTile(stream);
-        } catch (e) {
-          this.overlay = {
-            show: true,
-            emoji: "\uD83C\uDFA4",
-            title: "Need camera & mic",
-            body: "Please grant permission in your browser, then reload this page.",
-            dismissable: false,
-          };
-          return;
-        }
+          // --- Reconnection path ---
+          if (this._initialized) {
+            console.log("Reconnection detected, cleaning up and re-joining");
+            this._cleanupForRejoin();
 
-        if (this.mode === "host") {
-          if (this.code) {
-            console.log("Joining existing room:", this.code);
-            this.signaling.joinRoom(this.code, this.name);
-          } else {
-            console.log("Creating new room");
-            this.signaling.createRoom();
+            // Ensure media is ready before re-joining
+            if (!this.media.localStream) {
+              try {
+                const stream = await this.media.getLocalMedia();
+                if (this.micMuted) this.media.setMicEnabled(false);
+                if (this.camOff) this.media.setCamEnabled(false);
+                this._addLocalTile(stream);
+              } catch (e) {
+                console.error("Failed to re-acquire media on reconnect");
+                return;
+              }
+            }
+
+            if (this.code) {
+              this.signaling.joinRoom(this.code, this.name);
+            }
+            return;
           }
-        } else {
-          console.log("Guest joining room:", this.code);
-          this.signaling.joinRoom(this.code, this.name);
+
+          // --- First connection path ---
+          this._initialized = true;
+
+          try {
+            const stream = await this.media.getLocalMedia();
+            // FIX: sync track enabled state with UI toggles after acquiring media
+            if (this.micMuted) this.media.setMicEnabled(false);
+            if (this.camOff) this.media.setCamEnabled(false);
+            this._addLocalTile(stream);
+          } catch (e) {
+            this.overlay = {
+              show: true,
+              emoji: "\uD83C\uDFA4",
+              title: "Need camera & mic",
+              body: "Please grant permission in your browser, then reload this page.",
+              dismissable: false,
+            };
+            return;
+          }
+
+          if (this.mode === "host") {
+            if (this.code) {
+              console.log("Joining existing room:", this.code);
+              this.signaling.joinRoom(this.code, this.name);
+            } else {
+              console.log("Creating new room");
+              this.signaling.createRoom();
+            }
+          } else {
+            console.log("Guest joining room:", this.code);
+            this.signaling.joinRoom(this.code, this.name);
+          }
+        } finally {
+          this._connectInProgress = false;
         }
       });
     },
@@ -152,10 +185,11 @@ function room() {
         this.signaling.joinRoom(code, this.name);
       });
 
-      this.signaling.on("room-joined", async ({ code, myId, peers, mode, rtpCapabilities }) => {
+      this.signaling.on("room-joined", async ({ code, myId, peers, mode, rtpCapabilities, existingProducers }) => {
         this.code = code;
         this.myId = myId;
         this.roomMode = mode || "mesh";
+        this._existingProducers = existingProducers || [];
 
         // FIX: Populate this.peers from initial peer list.
         // Without this, peerCount resets to 1 whenever peer-joined/peer-left fires
@@ -343,6 +377,21 @@ function room() {
       for (const track of this.media.getProducibleTracks()) {
         await this.sfuClient.produce(track);
       }
+
+      // FIX: consume producers that already exist in the room
+      // (peers who produced before we connected)
+      if (this._existingProducers && this._existingProducers.length > 0) {
+        console.log(`SFU: consuming ${this._existingProducers.length} existing producers from room-joined`);
+        for (const { producerId, peerId, kind } of this._existingProducers) {
+          await this.sfuClient.consume(producerId, peerId, kind);
+        }
+        this._existingProducers = [];
+      }
+
+      // FIX: also request existing producers from server as fallback
+      // (handles upgrade-to-sfu race where new-producer events arrive
+      // before our listener is registered)
+      await this.sfuClient.consumeExisting();
 
       this._updateStatus("ok", "connected (SFU)");
       this._updateConnQuality();

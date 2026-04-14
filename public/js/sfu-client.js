@@ -142,6 +142,24 @@
       }
     }
 
+    // FIX: Request and consume all producers that already exist in the room.
+    // Handles race where peers produced before we registered new-producer listener.
+    async consumeExisting() {
+      try {
+        const { existingProducers } = await this._request("get-producers", {});
+        if (existingProducers && existingProducers.length > 0) {
+          console.log(`SFU: consuming ${existingProducers.length} existing producers`);
+          for (const { producerId, peerId, kind } of existingProducers) {
+            // Skip if we already have a consumer for this producer
+            if (this.consumers.has(producerId)) continue;
+            await this.consume(producerId, peerId, kind);
+          }
+        }
+      } catch (e) {
+        console.warn("SFU: consumeExisting failed:", e);
+      }
+    }
+
     // ------------------ Close ------------------
 
     async closeProducer(kind) {

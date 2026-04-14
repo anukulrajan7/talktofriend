@@ -51,17 +51,23 @@
       // Store handler references so we can remove them on close()
       this._handlers.peerJoined = ({ id, name }) => {
         if (this._closed) return;
+        console.log(`[mesh] peer-joined: ${name} (${id}), I will initiate WebRTC`);
         this._ensurePeer(id, name);
         this._initiate(id);
       };
 
       this._handlers.offer = async ({ from, sdp }) => {
         if (this._closed) return;
+        console.log(`[mesh] received OFFER from ${from}, SDP type=${sdp.type}`);
         try {
           const pc = await this._ensurePC(from);
           await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+          console.log(`[mesh] setRemoteDescription(offer) OK for ${from}`);
+          // FIX: drain ICE buffer AFTER setRemoteDescription — spec requires it
+          await this._drainIceBuffer(from);
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
+          console.log(`[mesh] answer created and sent to ${from}, SDP length=${answer.sdp.length}`);
           this.signaling.sendAnswer(from, answer);
         } catch (e) {
           console.error("[mesh] offer handling failed for", from, e);
@@ -72,10 +78,14 @@
 
       this._handlers.answer = async ({ from, sdp }) => {
         if (this._closed) return;
+        console.log(`[mesh] received ANSWER from ${from}`);
         try {
           const entry = this.peers.get(from);
-          if (!entry?.pc) return;
+          if (!entry?.pc) { console.warn("[mesh] no PC for answer from", from); return; }
           await entry.pc.setRemoteDescription(new RTCSessionDescription(sdp));
+          console.log(`[mesh] setRemoteDescription(answer) OK for ${from}, signalingState=${entry.pc.signalingState}`);
+          // FIX: drain ICE buffer AFTER setRemoteDescription
+          await this._drainIceBuffer(from);
         } catch (e) {
           console.error("[mesh] answer handling failed for", from, e);
           this._tearDown(from);
@@ -87,8 +97,8 @@
         if (this._closed) return;
         try {
           const entry = this.peers.get(from);
-          if (!entry?.pc) {
-            // Buffer ICE candidate until peer connection is created
+          // FIX: buffer ICE candidates until BOTH pc exists AND remoteDescription is set
+          if (!entry?.pc || !entry.pc.remoteDescription) {
             const peer = this._ensurePeer(from);
             peer.iceBuf.push(candidate);
             return;
@@ -121,12 +131,28 @@
       return this.peers.get(id);
     }
 
+    // Drain buffered ICE candidates — call AFTER setRemoteDescription
+    async _drainIceBuffer(peerId) {
+      const entry = this.peers.get(peerId);
+      if (!entry?.pc || !entry.iceBuf || entry.iceBuf.length === 0) return;
+      console.log(`[mesh] draining ${entry.iceBuf.length} buffered ICE candidates for ${peerId}`);
+      for (const c of entry.iceBuf) {
+        try {
+          await entry.pc.addIceCandidate(new RTCIceCandidate(c));
+        } catch (e) {
+          console.warn("[mesh] drainIce failed:", e);
+        }
+      }
+      entry.iceBuf = [];
+    }
+
     async _ensurePC(peerId) {
       const entry = this._ensurePeer(peerId);
       if (entry.pc) return entry.pc;
 
       // Wait for TURN credentials to be fetched before creating PeerConnection
       await iceReady;
+      console.log(`[mesh] creating PC for ${peerId}, ICE servers:`, ICE_SERVERS.length);
 
       const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
       entry.pc = pc;
@@ -136,11 +162,22 @@
       };
 
       pc.ontrack = (event) => {
-        const stream = event.streams[0];
-        if (stream) {
+        console.log(`[mesh] >>> ontrack from ${peerId}: kind=${event.track.kind}, readyState=${event.track.readyState}, streams=${event.streams.length}`);
+        // FIX: handle empty event.streams — some browsers don't associate
+        // tracks with streams, so we create a fallback MediaStream
+        let stream = event.streams[0];
+        if (!stream) {
+          console.warn("[mesh] ontrack: no stream in event, creating fallback for", peerId);
+          if (!entry.remoteStream) {
+            entry.remoteStream = new MediaStream();
+          }
+          stream = entry.remoteStream;
+          stream.addTrack(event.track);
+        } else {
           entry.remoteStream = stream;
-          this.cb.onRemoteStream?.(peerId, stream, entry.name);
         }
+        console.log(`[mesh] calling onRemoteStream for ${peerId}, tracks: audio=${stream.getAudioTracks().length} video=${stream.getVideoTracks().length}`);
+        this.cb.onRemoteStream?.(peerId, stream, entry.name);
       };
 
       pc.ondatachannel = (event) => {
@@ -175,6 +212,7 @@
       };
 
       // Add local tracks with quality constraints
+      console.log(`[mesh] localStream for ${peerId}:`, this.localStream ? `${this.localStream.getTracks().length} tracks` : 'NULL');
       if (this.localStream) {
         this.localStream.getTracks().forEach((track) => {
           const sender = pc.addTrack(track, this.localStream);
@@ -204,19 +242,15 @@
         });
       }
 
-      // Drain any buffered ICE candidates
-      if (entry.iceBuf && entry.iceBuf.length > 0) {
-        for (const c of entry.iceBuf) {
-          pc.addIceCandidate(new RTCIceCandidate(c)).catch(() => {});
-        }
-        entry.iceBuf = [];
-      }
+      // NOTE: ICE buffer is NOT drained here — it's drained in offer/answer
+      // handlers AFTER setRemoteDescription, per WebRTC spec requirements.
 
       return pc;
     }
 
     async _initiate(peerId) {
       try {
+        console.log(`[mesh] _initiate START for ${peerId}`);
         const entry = this._ensurePeer(peerId);
         const pc = await this._ensurePC(peerId);
 
@@ -227,6 +261,7 @@
 
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
+        console.log(`[mesh] _initiate: offer created and sent to ${peerId}, SDP length=${offer.sdp.length}`);
         this.signaling.sendOffer(peerId, offer);
       } catch (e) {
         console.error("[mesh] _initiate failed for", peerId, e);

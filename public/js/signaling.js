@@ -3,7 +3,10 @@
 (function () {
   class Signaling {
     constructor() {
-      this.socket = io({ autoConnect: false });
+      // FIX: force WebSocket transport to prevent double "connect" event
+      // (Socket.IO's HTTP-polling→WebSocket upgrade fires connect twice,
+      // which races with getLocalMedia and causes null localStream)
+      this.socket = io({ autoConnect: false, transports: ["websocket"] });
       this.myId = null;
       this.listeners = new Map();
 

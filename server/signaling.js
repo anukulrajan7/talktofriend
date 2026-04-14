@@ -300,12 +300,21 @@ function attach(io) {
         }
         const rtpCapabilities = router.rtpCapabilities;
 
+        // FIX: collect existing producers so new peer can consume them
+        const existingProducers = [];
+        for (const [peerId, sfuPeer] of room.sfuPeers.entries()) {
+          for (const [producerId, producer] of sfuPeer.producers.entries()) {
+            existingProducers.push({ producerId, peerId, kind: producer.kind });
+          }
+        }
+
         socket.emit("room-joined", {
           code,
           myId: socket.id,
           peers: existing,
           mode: "sfu",
           rtpCapabilities,
+          existingProducers,
         });
       } else {
         // Mesh mode (< SFU_THRESHOLD peers)
@@ -349,14 +358,33 @@ function attach(io) {
 
     // ---------------- SFU EVENTS ----------------
 
-    socket.on("get-rtp-capabilities", withMsgLimit(async (callback) => {
+    // FIX: Return existing producers so new peers can consume them
+    // FIX: Socket.IO passes (data, ackCallback) — first arg is data, second is callback
+    socket.on("get-producers", withMsgLimit(async (_data, callback) => {
       const code = socket.data.joinedRoom;
-      if (!code) return;
+      if (!code || typeof callback !== "function") return;
+
+      const room = rooms.get(code);
+      if (!room) { callback({ existingProducers: [] }); return; }
+
+      const existingProducers = [];
+      for (const [peerId, sfuPeer] of room.sfuPeers.entries()) {
+        if (peerId === socket.id) continue; // skip self
+        for (const [producerId, producer] of sfuPeer.producers.entries()) {
+          existingProducers.push({ producerId, peerId, kind: producer.kind });
+        }
+      }
+
+      callback({ existingProducers });
+    }));
+
+    // FIX: Socket.IO passes (data, ackCallback) — must accept both args
+    socket.on("get-rtp-capabilities", withMsgLimit(async (_data, callback) => {
+      const code = socket.data.joinedRoom;
+      if (!code || typeof callback !== "function") return;
 
       const router = await sfu.getOrCreateRouter(code);
-      if (typeof callback === "function") {
-        callback({ rtpCapabilities: router.rtpCapabilities });
-      }
+      callback({ rtpCapabilities: router.rtpCapabilities });
     }));
 
     socket.on("create-transport", withMsgLimit(async ({ direction }, callback) => {

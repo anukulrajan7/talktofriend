@@ -617,9 +617,16 @@ function room() {
 
       // Cam-off avatar (shows initials when video is off)
       const avatar = document.createElement("div");
+      // Random fun avatar emoji for cam-off (different per peer, consistent per session)
+      const avatarEmojis = ["🐱","🐶","🦊","🐼","🐨","🦁","🐯","🐸","🐵","🦉","🐙","🐧","🦋","🐬","🦄","🐲"];
+      const emojiIdx = (peerId || "").split("").reduce((a, c) => a + c.charCodeAt(0), 0) % avatarEmojis.length;
+      const avatarEmoji = avatarEmojis[emojiIdx];
       const initials = (name || "?").split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
       avatar.className = "cam-off-avatar absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 transition-opacity duration-300";
-      avatar.innerHTML = `<div class="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-brand-500/20 border border-brand-400/30 flex items-center justify-center text-2xl sm:text-3xl font-semibold text-brand-400">${initials}</div>`;
+      avatar.innerHTML = `<div class="flex flex-col items-center gap-1">
+        <div class="text-4xl sm:text-5xl">${avatarEmoji}</div>
+        <div class="text-xs text-dim font-medium">${isSelf ? name : initials}</div>
+      </div>`;
       tile.appendChild(avatar);
 
       // Name label
@@ -873,41 +880,33 @@ function room() {
         }
 
         if (this.blurEnabled) {
-          // Disable blur — restore original track
           const origTrack = this._bgProcessor.disable();
           this.blurEnabled = false;
           this._showToast("blur off");
 
-          // Replace track in all peer connections
           if (origTrack && this.mesh) {
             this.mesh.peers.forEach((entry) => {
               if (entry.videoSender) entry.videoSender.replaceTrack(origTrack);
             });
           }
-          // Update self-tile to show original
           const selfVideo = document.querySelector('[data-peer-id="self"] video');
           if (selfVideo && this.media.localStream) {
             selfVideo.srcObject = this.media.localStream;
           }
         } else {
-          // Enable blur
-          this._showToast("loading blur...");
-          await this._bgProcessor.init();
+          this._showToast("enabling blur...");
           const processedTrack = await this._bgProcessor.enable(this.media.videoTrack);
           this.blurEnabled = true;
-          this._showToast("blur on");
+          this._showToast("blur on (portrait mode)");
 
-          // Replace video track in all peer connections
           if (this.mesh) {
             this.mesh.peers.forEach((entry) => {
               if (entry.videoSender) entry.videoSender.replaceTrack(processedTrack);
             });
           }
-          // Update self-tile to show blurred output
           const selfVideo = document.querySelector('[data-peer-id="self"] video');
           if (selfVideo) {
             const blurStream = new MediaStream([processedTrack]);
-            // Keep audio from original stream
             const audioTrack = this.media.localStream?.getAudioTracks()[0];
             if (audioTrack) blurStream.addTrack(audioTrack);
             selfVideo.srcObject = blurStream;
@@ -915,7 +914,7 @@ function room() {
         }
       } catch (e) {
         console.error("Background blur failed:", e);
-        this._showToast("blur not available on this device");
+        this._showToast("blur failed — " + e.message);
         this.blurEnabled = false;
       }
     },

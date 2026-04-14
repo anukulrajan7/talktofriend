@@ -185,8 +185,10 @@ function attach(io) {
         peers: new Map(),
         createdAt: Date.now(),
         hostIp: ip,
+        hostSocketId: socket.id, // track host by socket ID (IP is unreliable for same-LAN users)
         mode: "mesh",
         sfuPeers: new Map(),
+        password: null, // optional — set by host via set-room-password
       });
 
       db.createRoom(code, ip);
@@ -204,7 +206,20 @@ function attach(io) {
     }));
 
     // ---------------- JOIN ROOM ----------------
-    socket.on("join-room", withMsgLimit(async ({ code, name }) => {
+    // Host can set a room password after creating
+    socket.on("set-room-password", withMsgLimit(({ password }) => {
+      const code = socket.data.joinedRoom;
+      if (!code) return;
+      const room = rooms.get(code);
+      if (!room) return;
+      // Only the host (room creator) can set password
+      if (room.hostSocketId !== socket.id) return;
+      room.password = password ? String(password).slice(0, 64) : null;
+      logger.info({ code, hasPassword: !!room.password }, "room password updated");
+      socket.emit("password-set", { ok: true });
+    }));
+
+    socket.on("join-room", withMsgLimit(async ({ code, name, password }) => {
       code = String(code || "").toLowerCase().trim();
       name = String(name || "").slice(0, 24).trim() || "anonymous";
 
@@ -213,6 +228,14 @@ function attach(io) {
       if (!room) {
         socket.emit("error-msg", { message: "Room does not exist." });
         return;
+      }
+
+      // Password check — host socket skips this
+      if (room.password && room.hostSocketId !== socket.id) {
+        if (!password || password !== room.password) {
+          socket.emit("error-msg", { message: "Wrong password.", needsPassword: true });
+          return;
+        }
       }
 
       if (room.peers.size >= limits.LIMITS.maxPeoplePerRoom) {

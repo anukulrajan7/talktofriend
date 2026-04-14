@@ -97,6 +97,30 @@ function room() {
         }
       });
 
+      // Global error reporter — sends client errors to server for production visibility
+      window.addEventListener("error", (e) => {
+        fetch("/api/client-errors", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            error: `${e.message} at ${e.filename}:${e.lineno}`,
+            context: "window.onerror",
+            userAgent: navigator.userAgent,
+          }),
+        }).catch(() => {});
+      });
+      window.addEventListener("unhandledrejection", (e) => {
+        fetch("/api/client-errors", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            error: String(e.reason).slice(0, 500),
+            context: "unhandledrejection",
+            userAgent: navigator.userAgent,
+          }),
+        }).catch(() => {});
+      });
+
       this.signaling.connect();
 
       this.signaling.socket.on("connect", async () => {

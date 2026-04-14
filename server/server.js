@@ -78,6 +78,20 @@ app.get("/api/turn-credentials", (_req, res) => {
   });
 });
 
+// ---------- Client error reporting (production visibility) ----------
+app.post("/api/client-errors", (req, res) => {
+  const { error, context, userAgent } = req.body || {};
+  if (!error) return res.status(400).json({ ok: false });
+  logger.warn({
+    clientError: String(error).slice(0, 500),
+    context: String(context || "").slice(0, 200),
+    ua: String(userAgent || "").slice(0, 200),
+    ip: req.ip,
+  }, "client-side error reported");
+  metrics.inc("clientErrors");
+  res.json({ ok: true });
+});
+
 // ---------- Chat history REST ----------
 app.get("/api/rooms/:code/chat", (req, res) => {
   const code = String(req.params.code || "").toLowerCase();

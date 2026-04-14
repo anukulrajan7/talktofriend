@@ -29,10 +29,16 @@ class MediaManager {
     '480p':  { width: { ideal: 640, min: 320 }, height: { ideal: 480, min: 240 }, frameRate: { ideal: 24, max: 30 } },
   };
 
+  // Detect mobile devices — they get lower default quality
+  static isMobile() {
+    return /Android|iPhone|iPad|iPod|webOS|Opera Mini/i.test(navigator.userAgent)
+      || (navigator.maxTouchPoints > 0 && window.innerWidth < 768);
+  }
+
   // Get camera + mic. Returns MediaStream.
-  // Tries requested quality first, falls back to lower on failure.
+  // Auto-selects quality based on device type if not specified.
   async getLocalMedia(opts = {}) {
-    const quality = opts.quality || '720p';
+    const quality = opts.quality || (MediaManager.isMobile() ? '480p' : '720p');
     const videoPreset = MediaManager.QUALITY[quality] || MediaManager.QUALITY['720p'];
 
     const constraints = {

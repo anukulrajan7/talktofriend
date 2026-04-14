@@ -22,7 +22,7 @@ function socket() {
 function cleanupSockets() {
   testSockets.forEach(s => { try { s.disconnect(); } catch {} });
   testSockets = [];
-  return new Promise(r => setTimeout(r, 100)); // let server process disconnects
+  return new Promise(r => setTimeout(r, 500)); // let server process disconnects
 }
 
 function waitEvent(s, event, timeoutMs = 5000) {
@@ -340,6 +340,133 @@ async function run() {
     checker.emit("join-room", { code, name: "late" });
     const { message } = await waitEvent(checker, "error-msg");
     assert(message.includes("does not exist"), "room still exists after all left");
+  });
+
+  // ── SFU Deep Integration ──
+  console.log("\n\x1b[1mSFU Deep Integration\x1b[0m");
+
+  await test("5-peer SFU: all peers can create transports after upgrade", async () => {
+    const peers = [];
+    for (let i = 0; i < 5; i++) peers.push(socket());
+
+    const { code } = await createAndJoin(peers[0], "P1");
+    // Drain peer-joined events on P1 as peers join
+    for (let i = 1; i < 4; i++) {
+      const pj = waitEvent(peers[0], "peer-joined");
+      await joinExisting(peers[i], code, `P${i+1}`);
+      await pj;
+    }
+    // P5 triggers SFU upgrade
+    const upgradeP1 = waitEvent(peers[0], "upgrade-to-sfu", 10000);
+    await joinExisting(peers[4], code, "P5");
+    await upgradeP1;
+
+    // Every peer should be able to get rtp capabilities and create transports
+    for (let i = 0; i < 5; i++) {
+      const caps = await emitAck(peers[i], "get-rtp-capabilities", {});
+      assert(caps.rtpCapabilities, `P${i+1}: no rtp capabilities`);
+      const sendTp = await emitAck(peers[i], "create-transport", { direction: "send" });
+      assert(sendTp.id, `P${i+1}: no send transport`);
+      const recvTp = await emitAck(peers[i], "create-transport", { direction: "recv" });
+      assert(recvTp.id, `P${i+1}: no recv transport`);
+    }
+  });
+
+  await test("6th peer joins existing SFU room with existingProducers field", async () => {
+    const peers = [];
+    for (let i = 0; i < 6; i++) peers.push(socket());
+
+    const { code } = await createAndJoin(peers[0], "P1");
+    for (let i = 1; i < 4; i++) {
+      const pj = waitEvent(peers[0], "peer-joined");
+      await joinExisting(peers[i], code, `P${i+1}`);
+      await pj;
+    }
+    // P5 triggers upgrade
+    const up = waitEvent(peers[0], "upgrade-to-sfu", 10000);
+    await joinExisting(peers[4], code, "P5");
+    await up;
+
+    // P6 joins — room already in SFU mode
+    const j6 = await joinExisting(peers[5], code, "P6");
+    assertEqual(j6.mode, "sfu");
+    assert(Array.isArray(j6.existingProducers), "P6 missing existingProducers");
+    // get-producers should also work for P6
+    const prod = await emitAck(peers[5], "get-producers", {});
+    assert(Array.isArray(prod.existingProducers), "get-producers failed for P6");
+  });
+
+  await test("peer leaving SFU room notifies others via peer-left", async () => {
+    const peers = [];
+    for (let i = 0; i < 5; i++) peers.push(socket());
+
+    const { code } = await createAndJoin(peers[0], "P1");
+    for (let i = 1; i < 4; i++) {
+      const pj = waitEvent(peers[0], "peer-joined");
+      await joinExisting(peers[i], code, `P${i+1}`);
+      await pj;
+    }
+    const up = waitEvent(peers[0], "upgrade-to-sfu", 10000);
+    const pj4 = waitEvent(peers[0], "peer-joined");
+    await joinExisting(peers[4], code, "P5");
+    await up;
+    await pj4;
+
+    // P3 leaves — P1 should get peer-left
+    const leftPromise = waitEvent(peers[0], "peer-left");
+    peers[2].disconnect();
+    const left = await leftPromise;
+    assert(left.id, "peer-left missing id");
+  });
+
+  // ── Room Password ──
+  console.log("\n\x1b[1mRoom Password\x1b[0m");
+
+  await test("host can set room password", async () => {
+    const host = socket();
+    await createAndJoin(host, "Host");
+    host.emit("set-room-password", { password: "secret123" });
+    const res = await waitEvent(host, "password-set");
+    assert(res.ok, "password-set not ok");
+  });
+
+  await test("guest rejected without correct password", async () => {
+    const host = socket();
+    const { code } = await createAndJoin(host, "Host");
+    host.emit("set-room-password", { password: "mypass" });
+    await waitEvent(host, "password-set");
+
+    const guest = socket();
+    await waitConnect(guest);
+    guest.emit("join-room", { code, name: "Guest" }); // no password
+    const err = await waitEvent(guest, "error-msg");
+    assert(err.message.includes("password") || err.message.includes("Wrong"), `unexpected: ${err.message}`);
+  });
+
+  await test("guest accepted with correct password", async () => {
+    const host = socket();
+    const { code } = await createAndJoin(host, "Host");
+    host.emit("set-room-password", { password: "abc" });
+    await waitEvent(host, "password-set");
+
+    const guest = socket();
+    await waitConnect(guest);
+    guest.emit("join-room", { code, name: "Guest", password: "abc" });
+    const joined = await waitEvent(guest, "room-joined");
+    assertEqual(joined.peers.length, 1);
+  });
+
+  // ── Client Error Endpoint ──
+  console.log("\n\x1b[1mClient Error Reporting\x1b[0m");
+
+  await test("POST /api/client-errors accepts error reports", async () => {
+    const res = await fetch(`${URL}/api/client-errors`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ error: "test error", context: "unit test", userAgent: "test/1.0" }),
+    });
+    const data = await res.json();
+    assert(data.ok, "client error report not ok");
   });
 
   // ── Results ──
